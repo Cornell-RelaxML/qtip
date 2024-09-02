@@ -1,5 +1,5 @@
 def has_kernel(decode_mode, L, K, V, tlut_bits, td_x, td_y):
-11;rgb:ffff/ffff/ffffif decode_mode != 'quantlut_sym':
+    if decode_mode != 'quantlut_sym':
         return False
     if L != 16:
         return False
