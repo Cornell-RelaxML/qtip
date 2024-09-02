@@ -106,7 +106,7 @@ def main(args):
     for name, module in quant_model.named_modules():
         if isinstance(module, QuantizedLinear):
             del module.codebook_class
-            if args.ft_train_lut:
+            if args.ft_train_lut and not module.has_kernel:
                 module.trellis = module.packed_trellis
     quant_model = quant_model.to(orig_dtype)
     quant_model.config._name_or_path = args.base_model

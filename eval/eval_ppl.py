@@ -19,18 +19,21 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--hf_path', default='hfized/quantized_hada_70b', type=str)
 parser.add_argument('--seqlen', default=4096, type=int)
-parser.add_argument('--no_manifest', action='store_true')
+parser.add_argument('--manifest', action='store_true')
 
 
 def main(args):
     datasets = ['wikitext2', 'c4']
     model, model_str = model_from_hf_path(args.hf_path)
 
-    if not args.no_manifest:
-        # manifest for faster inference
+   
+    if args.manifest:
+        # manifest the model in BF/FP16 for faster inference
+        # useful for non-kernel supported decode modes
         for module in model.modules():
             if isinstance(module, QuantizedLinear):
                 module.mode = 'train-fixW'
+   
 
     for dataset in datasets:
         input_tok = gptq_data_utils.get_test_tokens(dataset,
@@ -40,9 +43,6 @@ def main(args):
         nsamples = input_tok.numel() // args.seqlen
         input_tok = input_tok[0, :(args.seqlen * nsamples)].view(
             nsamples, args.seqlen)
-
-        if not args.no_use_cuda_graph:
-            model.reset()
 
         loss_fct = torch.nn.CrossEntropyLoss().cuda()
         acc_loss = 0.0
