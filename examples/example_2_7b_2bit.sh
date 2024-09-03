@@ -3,6 +3,7 @@
 CKPT=ckpt
 HF=hfized
 LOG=logs
+HESS=YOUR/HESSIAN/PATH/HERE
 
 mkdir $CKPT
 mkdir $LOG
@@ -14,7 +15,7 @@ python -m quantize_llama.quantize_finetune_llama \
        --save_path $CKPT/2_7b_2bit \
        --codebook bitshift \
        --base_model meta-llama/Llama-2-7b-hf \
-       --in_hess_path /data_persistent3/restoration/mk-1-20240603/hessians/llama2_7b_6144/ \
+       --in_hess_path $HESS/hessians/llama2_7b_6144/ \
        --scale_override 0.9 \
        --ft_epochs 5 \
        --td_x 16 \
