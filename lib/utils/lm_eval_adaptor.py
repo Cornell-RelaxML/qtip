@@ -3,7 +3,6 @@ import fnmatch
 import torch
 import transformers
 from lm_eval.base import BaseLM
-#from lm_eval.models.huggingface import HFLM as BaseLM
 # adapted from https://github.com/mit-han-lab/llm-awq/tree/main
 
 
@@ -54,15 +53,6 @@ class LMEvalAdaptor(BaseLM):
             return self.model.config.max_position_embeddings
         elif hasattr(self.model.config, 'n_positions'):
             return self.model.config.n_positions
-        # Jerry: need to check these defaults
-        # elif 'bloom' in self.model_name:
-        #     return 2048
-        # elif 'llama' in self.model_name:
-        #     return 2048  # TODO: did not check this
-        # elif 'mpt' in self.model_name:
-        #     return 2048
-        # elif 'falcon' in self.model_name:
-        #     return 2048
         else:
             print(self.model.config)
             raise NotImplementedError

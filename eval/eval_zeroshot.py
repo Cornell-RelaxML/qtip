@@ -29,10 +29,12 @@ def main(args):
     model, model_str = model_from_hf_path(args.hf_path)
 
     # manifest for faster inference
+    # use for codebooks without kernel support
+    '''
     for module in model.modules():
         if isinstance(module, QuantizedLinear):
             module.mode = 'train-fixW'
-
+    '''
     tokenizer = AutoTokenizer.from_pretrained(model_str)
 
     glog.info('loaded model!')

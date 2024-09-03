@@ -8,7 +8,6 @@ mkdir $CKPT
 mkdir $LOG
 mkdir $HF
 
-
 # Quantize to 2 bits (K = 2) with the hybrid code, a 16x16 tile size (td_x = 16, td_y = 16), L = 16, 2 weights at once (V = 2), and 5 epochs of fine tuning.
 # Changing K changes the bitrate. --decode_mode controls the code (eg 3INST or 1MAD). To use 3INST and 1MAD, additionally set --tlut_bits to 0.
 python -m quantize_llama.quantize_finetune_llama \
@@ -34,4 +33,4 @@ python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-7b-h
 
 # Evaluate perplexity and zeroshot performance.
 CUDA_VISIBLE_DEVICES=0 python -m eval.eval_ppl  --hf_path $HF/2_7b_2bit >> $LOG/2_7b_2bit 2>&1 
-CUDA_VISIBLE_DEVICES=0 python -m eval.eval_zeroshot --tasks arc_challenge,arc_easy,boolq,piqa,winogrande --batch_size 4  --hf_path $HF/2_7b_2bit >> $LOG/2_7b_2bit 2>&1
+CUDA_VISIBLE_DEVICES=0 python -m eval.eval_zeroshot --tasks arc_challenge,arc_easy,boolq,piqa,winogrande --batch_size 16  --hf_path $HF/2_7b_2bit # >> $LOG/2_7b_2bit 2>&1
