@@ -15,7 +15,6 @@ torch.set_grad_enabled(False)
 parser = argparse.ArgumentParser()
 parser.add_argument('--quantized_path', type=str)
 parser.add_argument('--hf_output_path', type=str)
-parser.add_argument('--no_v', action='store_true')
 
 
 def main(args):
@@ -59,10 +58,9 @@ def main(args):
                                  map_location=cpu)
         utils.unpack_quip(layer.self_attn.k_proj, saved_layer)
 
-        if not args.no_v:
-            saved_layer = torch.load(f'{args.quantized_path}/{ii}_v.pt',
-                                     map_location=cpu)
-            utils.unpack_quip(layer.self_attn.v_proj, saved_layer)
+        saved_layer = torch.load(f'{args.quantized_path}/{ii}_v.pt',
+                                 map_location=cpu)
+        utils.unpack_quip(layer.self_attn.v_proj, saved_layer)
 
         saved_layer = torch.load(f'{args.quantized_path}/{ii}_up.pt',
                                  map_location=cpu)
@@ -86,24 +84,9 @@ def main(args):
 
     del model
 
-    model, _ = model_from_hf_path(args.hf_output_path, use_cuda_graph=False)
+    model, _ = model_from_hf_path(args.hf_output_path)
 
     glog.info('successfully loaded hfized model')
-    '''
-    glog.info('generating some text...')
-
-    start = time.time()
-    prompt = 'It is a truth universally acknowledged that'
-    inputs = tokenizer(prompt, return_tensors='pt')
-    outputs = model.generate(input_ids=inputs['input_ids'].cuda(),
-                             attention_mask=inputs['attention_mask'].cuda(),
-                             max_new_tokens=64,
-                             return_dict_in_generate=True)
-    token = outputs.sequences[0, :]
-    output_str = tokenizer.decode(token)
-    glog.info(output_str)
-    glog.info(f'elapsed: {time.time() - start}')
-    '''
 
 
 if __name__ == '__main__':

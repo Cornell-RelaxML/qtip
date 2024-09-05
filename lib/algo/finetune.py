@@ -126,10 +126,14 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                               -1, args.td_x * args.td_y // args.V))
 
         if has_kernel:
+            packed = packed.view(torch.uint8)
             packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
-                                    args.K * 16 * 16 // 16).permute(
+                                    args.K * 16 * 16 // (8 * args.K)).permute(
                                         0, 2, 4, 3, 1).reshape(packed.shape)
+            packed = packed.view(torch.int16).cpu()
 
+        # TODO TEST 
+            
         Wr *= Wscale
         hatWr *= Wscale
 
@@ -142,7 +146,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         torch.save(
             {
                 'trellis':
-                packed.view(torch.int16).cpu(),
+                packed,
                 'SU':
                 SU.to(orig_dtype).cpu(),
                 'SV':
