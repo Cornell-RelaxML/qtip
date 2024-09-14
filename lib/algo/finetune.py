@@ -12,7 +12,6 @@ from transformers import AutoModelForCausalLM
 
 from lib import codebook, utils
 from lib.linear import QuantizedLinear
-
 from . import ldlq
 
 
@@ -103,9 +102,11 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         in_hess_path = f'{args.in_hess_path}/{idx}_{in_hess_name}.pt'
         H_data = torch.load(in_hess_path, map_location=torch.device('cpu'))
         HR = utils.flat_to_sym(H_data['flatH'], H_data['n'])
-        mu = H_data['mu']
-        HR += mu[None, :] * mu[:, None]
-        del H_data, mu
+        if 'mu' in H_data:
+            mu = H_data['mu']
+            HR += mu[None, :] * mu[:, None]
+            del mu
+        del H_data
 
         HR = utils.regularize_H(HR, args.sigma_reg)
         HRr = utils.matmul_hadUt(utils.matmul_hadUt(HR.to(device) * SU).T * SU)
@@ -120,18 +121,41 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
 
         hatWr, Qidxs = ldlq.LDLQ(Wr, LRr, cb, args, for_kernel=has_kernel)
 
+        hatW = (utils.matmul_hadU((utils.matmul_hadU(hatWr) * SU).T) * SV).T
+        
         packed = cb.pack_trellis(
             Qidxs.reshape(m // args.td_x, args.td_x, n // args.td_y,
                           args.td_y // args.V).transpose(1, 2).reshape(
                               -1, args.td_x * args.td_y // args.V))
 
-        if has_kernel:
+        x = torch.randn(1, n, device=device, dtype=torch.float16)
+
+        print(x @ hatW.to(torch.float16).T)
+        
+        
+        if True or has_kernel:
+            packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
+                                    args.K * 16 * 16 // 16).permute(
+                                        0, 2, 4, 3, 1).reshape(packed.shape)
+            '''
             packed = packed.view(torch.uint8)
             packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
-                                    args.K * 16 * 16 // (8 * args.K)).permute(
+                                    args.K * 16 * 16 // 8).permute(
+                                        0, 2, 4, 3, 1).reshape(packed.shape)
+            '''
+            packed = packed.view(torch.int16)#.cpu()
+
+        print(torch.ops.quip_lib.decompress_matvec_qtip_4096_1_4096_2(packed, x, cb.tlut))
+        exit()
+            
+            
+        '''
+        if has_kernel:
+            packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
+                                    args.K * 16 * 16 // 16).permute(
                                         0, 2, 4, 3, 1).reshape(packed.shape)
             packed = packed.view(torch.int16).cpu()
-
+        '''        
         # TODO TEST 
             
         Wr *= Wscale

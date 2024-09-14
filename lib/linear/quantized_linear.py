@@ -46,7 +46,7 @@ class QuantizedLinear(nn.Module):
                         dtype=torch.int16))
 
         if decode_mode in ['lut', 'quantlut', 'quantlut_sym']:
-            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits, V),
+            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits, V, dtype=torch.float16),
                                      requires_grad=False)
         else:
             self.tlut = None

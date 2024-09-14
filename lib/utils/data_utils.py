@@ -281,7 +281,7 @@ def unpack_quip(module, saved_layer):
     module.SU.copy_(saved_layer['SU'])
     module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
     if module.tlut is not None:
-        module.tlut.copy_(saved_layer['tlut'])
+        module.tlut.copy_(saved_layer['tlut'].float().to(torch.float16))
     
 
 def dtype_from_str(str):
