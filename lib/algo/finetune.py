@@ -94,6 +94,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         cb = cb.to(device).to(orig_dtype)
         orig_linear = attrgetter(linear_attr)(mixed_layer)
         W = orig_linear.weight.to(dtype_)
+        print(W)
         (m, n) = W.shape
         SU = (torch.randn(n, device=device).sign() + 1e-5).sign().to(dtype_)
         SV = (torch.randn(m, device=device).sign() + 1e-5).sign().to(dtype_)
@@ -121,32 +122,28 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
 
         hatWr, Qidxs = ldlq.LDLQ(Wr, LRr, cb, args, for_kernel=has_kernel)
 
-        hatW = (utils.matmul_hadU((utils.matmul_hadU(hatWr) * SU).T) * SV).T
+        hatW = (utils.matmul_hadU((utils.matmul_hadU(hatWr * Wscale) * SU).T) * SV).T
         
         packed = cb.pack_trellis(
             Qidxs.reshape(m // args.td_x, args.td_x, n // args.td_y,
                           args.td_y // args.V).transpose(1, 2).reshape(
                               -1, args.td_x * args.td_y // args.V))
 
-        x = torch.randn(1, n, device=device, dtype=torch.float16)
-
-        print(x @ hatW.to(torch.float16).T)
+        x = torch.zeros(1, n, device=device, dtype=torch.float16)
+        x[0][0] = 1
         
         
         if True or has_kernel:
-            packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
-                                    args.K * 16 * 16 // 16).permute(
-                                        0, 2, 4, 3, 1).reshape(packed.shape)
-            '''
-            packed = packed.view(torch.uint8)
-            packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
-                                    args.K * 16 * 16 // 8).permute(
-                                        0, 2, 4, 3, 1).reshape(packed.shape)
-            '''
-            packed = packed.view(torch.int16)#.cpu()
+            packed = packed.view(torch.uint8).reshape(m // 16 // 2, 2, n // 16 // 2, 2,
+                                                       16 * 16 // 8, args.K).permute(0, 2, 4, 3, 1, 5).reshape(packed.shape[0], packed.shape[1]*2).view(torch.int16)
 
-        print(torch.ops.quip_lib.decompress_matvec_qtip_4096_1_4096_2(packed, x, cb.tlut))
+        y = x @ hatWr.to(torch.float16).T
+        print(y[0:16])
+        exec(f'print(torch.ops.quip_lib.decompress_matvec_qtip_4096_1_4096_{args.K}(packed.view(torch.int16), x, cb.tlut)[0:16])')
+
         exit()
+
+            
             
             
         '''
@@ -207,6 +204,10 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
             q_linear.tlut.copy_(cb.tlut.data)
             q_linear.tlut.requires_grad = args.ft_train_lut
 
+        q_linear(x)
+        print(q_linear.codebook_class.get_hatW_kernel(packed, m, n))
+        exit()
+            
         split_attr = linear_attr.split('.')
         setattr(
             attrgetter('.'.join(split_attr[:-1]))(mixed_layer), split_attr[-1],
