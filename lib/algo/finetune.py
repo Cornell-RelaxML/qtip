@@ -138,8 +138,9 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                                                        16 * 16 // 8, args.K).permute(0, 2, 4, 3, 1, 5).reshape(packed.shape[0], packed.shape[1]*2).view(torch.int16)
 
         y = x @ hatWr.to(torch.float16).T
-        print(y[0:16])
-        exec(f'print(torch.ops.quip_lib.decompress_matvec_qtip_4096_1_4096_{args.K}(packed.view(torch.int16), x, cb.tlut)[0:16])')
+        torch.set_printoptions(linewidth=256)
+        print(y.sum())
+        exec(f'print(torch.ops.quip_lib.decompress_matvec_qtip_4096_1_4096_{args.K}(packed.view(torch.int16), x, cb.tlut).sum())')
 
         exit()
 
