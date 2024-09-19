@@ -5,7 +5,7 @@ def has_kernel(decode_mode, L, K, V, tlut_bits, td_x, td_y):
         return False
     if V != 2:
         return False
-    if K != 2:
+    if K < 2 or K > 4:
         return False
     if tlut_bits != 9:
         return False

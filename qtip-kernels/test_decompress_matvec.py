@@ -193,8 +193,21 @@ def decode_compressed(L, S, R, V, m, k, compressed, codebook):
 
     assert compressed.shape == (R * m * k // 16, )
 
+    BLOCK_SIZE = 16 * 16
+
     BITS_PER_BLOCK = R * 16 * 16  # R bits * f16 mma tile A size
 
+    compressed = (compressed.view(torch.uint8)
+                  .reshape(m // 16 // 2, k // 16 // 2, BLOCK_SIZE // 8, 2, 2, R)
+                  .permute(0, -2, 1, -3, 2, -1)
+                  # big endian across words, little endian within words ...
+                  .flip((-1,))
+                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16, 2)
+                  .flip((-1,))
+                  .view(torch.uint16)
+                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16))
+
+    '''
     # unswizzle interleaved blocks
 
     compressed = (compressed.reshape(m // 16 // 2, k // 16 // 2,
@@ -202,7 +215,7 @@ def decode_compressed(L, S, R, V, m, k, compressed, codebook):
                                          0, -1, 1, -2,
                                          2).reshape(m // 16, k // 16,
                                                     BITS_PER_BLOCK // 16))
-
+    '''
     # decode block
 
     assert L == 16
