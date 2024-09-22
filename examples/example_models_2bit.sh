@@ -3,7 +3,7 @@
 CKPT=/data_persistent3/alberttseng/qtip_examples/ckpt
 HF=/data_persistent3/alberttseng/qtip_examples/hfized
 LOG=/data_persistent3/alberttseng/qtip_examples/logs
-HESS=YOUR/PATH/HERE
+HESS=/data_persistent3/restoration/mk-1-20240603/hessians/
 
 mkdir $CKPT
 mkdir $LOG
