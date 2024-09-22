@@ -12,7 +12,6 @@ from transformers import AutoModelForCausalLM
 
 from lib import codebook, utils
 from lib.linear import QuantizedLinear
-
 from . import ldlq
 
 
@@ -103,9 +102,11 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         in_hess_path = f'{args.in_hess_path}/{idx}_{in_hess_name}.pt'
         H_data = torch.load(in_hess_path, map_location=torch.device('cpu'))
         HR = utils.flat_to_sym(H_data['flatH'], H_data['n'])
-        mu = H_data['mu']
-        HR += mu[None, :] * mu[:, None]
-        del H_data, mu
+        if 'mu' in H_data:
+            mu = H_data['mu']
+            HR += mu[None, :] * mu[:, None]
+            del mu
+        del H_data
 
         HR = utils.regularize_H(HR, args.sigma_reg)
         HRr = utils.matmul_hadUt(utils.matmul_hadUt(HR.to(device) * SU).T * SU)
@@ -126,9 +127,9 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                               -1, args.td_x * args.td_y // args.V))
 
         if has_kernel:
-            packed = packed.reshape(m // 16 // 2, 2, n // 16 // 2, 2,
-                                    args.K * 16 * 16 // 16).permute(
-                                        0, 2, 4, 3, 1).reshape(packed.shape)
+            packed = packed.view(torch.uint8).view(-1, 2).flip((-1,)).reshape(
+                m // 16 // 2, 2, n // 16 // 2, 2, 16 * 16 // 8, args.K).permute(
+                    0, 2, 4, 3, 1, 5).flip((-1,)).contiguous().flatten().view(torch.int16)
 
         Wr *= Wscale
         hatWr *= Wscale
@@ -142,7 +143,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         torch.save(
             {
                 'trellis':
-                packed.view(torch.int16).cpu(),
+                packed.cpu(),
                 'SU':
                 SU.to(orig_dtype).cpu(),
                 'SV':

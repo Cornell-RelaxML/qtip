@@ -91,7 +91,7 @@ def matmul_hadUt(X):
 torch.library.define("hadamard::hadamard", "(Tensor x, float scale) -> Tensor")
 
 
-@torch.library.impl_abstract("hadamard::hadamard")
+@torch.library.register_fake("hadamard::hadamard")
 def hadamard_abstract(x: torch.Tensor, scale: float) -> torch.Tensor:
     return x
 

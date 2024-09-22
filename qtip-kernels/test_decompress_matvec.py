@@ -193,8 +193,21 @@ def decode_compressed(L, S, R, V, m, k, compressed, codebook):
 
     assert compressed.shape == (R * m * k // 16, )
 
+    BLOCK_SIZE = 16 * 16
+
     BITS_PER_BLOCK = R * 16 * 16  # R bits * f16 mma tile A size
 
+    compressed = (compressed.view(torch.uint8)
+                  .reshape(m // 16 // 2, k // 16 // 2, BLOCK_SIZE // 8, 2, 2, R)
+                  .permute(0, -2, 1, -3, 2, -1)
+                  # big endian across words, little endian within words ...
+                  .flip((-1,))
+                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16, 2)
+                  .flip((-1,))
+                  .view(torch.uint16)
+                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16))
+
+    '''
     # unswizzle interleaved blocks
 
     compressed = (compressed.reshape(m // 16 // 2, k // 16 // 2,
@@ -202,14 +215,14 @@ def decode_compressed(L, S, R, V, m, k, compressed, codebook):
                                          0, -1, 1, -2,
                                          2).reshape(m // 16, k // 16,
                                                     BITS_PER_BLOCK // 16))
-
+    '''
     # decode block
 
-    assert L <= 16
+    assert L == 16
 
     blocked = compressed.reshape(R * m * k // BITS_PER_BLOCK,
                                  BITS_PER_BLOCK // 16, 1)
-    blocked_roll = torch.roll(blocked.cpu(), 1, -2).cuda()
+    blocked_roll = torch.roll(blocked.cpu(), -1, -2).cuda()
     blocked32 = torch.cat((blocked_roll, blocked),
                           dim=-1).reshape(blocked.shape[0],
                                           -1).contiguous().view(torch.uint32)
@@ -220,7 +233,7 @@ def decode_compressed(L, S, R, V, m, k, compressed, codebook):
                                              16).view(torch.int32)
     shifts = (torch.arange(0, 16, dtype=torch.int32, device="cuda")).to(
         torch.int32).reshape(1, 1, -1).expand(expanded32.shape)
-    shifted = expanded32 >> shifts
+    shifted = expanded32 >> (16 - shifts)
     indices = torch.bitwise_and(
         shifted.reshape(shifted.shape[0], -1)[:, 16 - L::R << V], (1 << L) - 1)
 
@@ -269,7 +282,7 @@ def test_kernels(L, S, R, V):
         else:
             decompress_matvec_time(R, (out, compressed, x, codebook),
                                    prepare_arguments(L, S, R, V, m, n, k)[:4])
-        if not os.getenv("NOCHECK") and R == 2:
+        if not os.getenv("NOCHECK"):
             ref = (decompressed @ x)
             allclose = torch.allclose(out.half(), ref, atol=1e-5, rtol=0.01)
             if not allclose:
@@ -282,6 +295,7 @@ def test_kernels(L, S, R, V):
             except:
                 import traceback
                 traceback.print_exc()
+                exit()
             print("real test", m, n, k,
                   torch.sum(out).item(), "=",
                   torch.sum(decompressed @ x).item(), "allclose", allclose)
@@ -291,6 +305,7 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     L, S, V = 16, 9, 1
     for R in range(2, 5):
+        print(R)
         #sanity_check(L, S, R, V)
         test_kernels(L, S, R, V)
     if os.getenv("QS"): time_qs_kernels()

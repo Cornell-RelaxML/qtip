@@ -50,7 +50,7 @@ for m, n, k, bitrate in kernels:
     name = f"decompress_matvec_qtip_{m}_{n}_{k}_{bitrate}"
     kernel_name = f"qtip_kernels.decompress_matvec_16_9_{bitrate}_1_{m}_{n}_{k}"
     exec(f"""\
-@torch.library.impl_abstract("quip_lib::{name}")
+@torch.library.register_fake("quip_lib::{name}")
 def {name}_abstract(
         compressed: torch.Tensor,
         x: torch.Tensor,

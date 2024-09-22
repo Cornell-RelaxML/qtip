@@ -135,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_samples', type=int, default=5, help='Number of samples.')
     parser.add_argument('--max_new_tokens', type=int, default=512, help='Maximum number of new tokens.')
     parser.add_argument('--top_k', type=int, default=32, help='Top-k for sampling.')
-    parser.add_argument('--compile', action='store_true', help='Whether to compile the model.')
+    parser.add_argument('--no_compile', action='store_true', help='Whether to compile the model.')
 
     args = parser.parse_args()
-    main(args.hf_path, args.compile, args.streaming, args.num_samples, args.max_new_tokens, args.top_k)
+    main(args.hf_path, not args.no_compile, args.streaming, args.num_samples, args.max_new_tokens, args.top_k)

@@ -41,12 +41,11 @@ class QuantizedLinear(nn.Module):
         # packed into int16
         self.register_buffer(
             'trellis',
-            torch.zeros((out_features // td_x) * (in_features // td_y),
-                        math.ceil((td_x * td_y) * K / 16),
+            torch.zeros((out_features // td_x) * (in_features // td_y) * math.ceil((td_x * td_y) * K / 16),
                         dtype=torch.int16))
 
         if decode_mode in ['lut', 'quantlut', 'quantlut_sym']:
-            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits, V),
+            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits, V, dtype=torch.float16),
                                      requires_grad=False)
         else:
             self.tlut = None
