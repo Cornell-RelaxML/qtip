@@ -143,7 +143,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         torch.save(
             {
                 'trellis':
-                packed,
+                packed.cpu(),
                 'SU':
                 SU.to(orig_dtype).cpu(),
                 'SV':
