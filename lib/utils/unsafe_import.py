@@ -27,10 +27,10 @@ def model_from_hf_path(path,
         model_str = path
 
     model = model_cls.from_pretrained(
-        path,
-        torch_dtype='auto',
-        low_cpu_mem_usage=True,
-        attn_implementation='sdpa',
-        device_map=device_map)
+        path,)
+        #torch_dtype='auto',
+        #low_cpu_mem_usage=True,
+        #attn_implementation='sdpa',
+        #device_map=device_map)
 
     return model, model_str

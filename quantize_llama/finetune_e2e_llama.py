@@ -69,6 +69,11 @@ def main(args):
             low_cpu_mem_usage=True)
 
     start_dev = max(orig_model.hf_device_map.values()) + 1
+    rank = int(os.environ["LOCAL_RANK"])
+    print(start_dev)
+    torch.cuda.set_device(rank + start_dev)
+    
+    '''
     end_dev = torch.cuda.device_count()
     fake_dev_map = {
         'model.embed_tokens': start_dev,
@@ -81,14 +86,17 @@ def main(args):
     for i in range(len(orig_model.model.layers)):
         fake_dev_map[f'model.layers.{i}'] = (i + 1) // per_dev + start_dev
 
-    orig_dtype = orig_model.model.embed_tokens.weight.dtype
     print(orig_dtype)
     print(fake_dev_map)
+    '''
+    
+    orig_dtype = orig_model.model.embed_tokens.weight.dtype
     del orig_model  # remanifest in eval process
     utils.clean()
 
-    quant_model = model_from_hf_path(args.hf_path,
-                                     device_map=fake_dev_map)[0].float()
+
+    
+    quant_model = model_from_hf_path(args.hf_path)[0].float().to(rank+start_dev)
 
     for name, module in quant_model.named_modules():
         if isinstance(module, QuantizedLinear):
@@ -98,6 +106,12 @@ def main(args):
                 module.tlut.requires_grad = True
             module.mode = 'train-recons' if args.ft_train_lut else 'train-fixW'
             module.grad_ckpt = args.ft_grad_ckpt
+
+    from torch.distributed.fsdp import FullyShardedDataParallel
+
+    torch.distributed.init_process_group(backend='nccl', world_size=torch.cuda.device_count() - start_dev)
+    quant_model = FullyShardedDataParallel(quant_model)
+            
     utils.clean()
     with torch.enable_grad():
         finetune.finetune_susv_e2e(quant_model, start_dev, devset, orig_dtype,

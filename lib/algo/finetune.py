@@ -9,7 +9,7 @@ import glog
 import torch
 from torch import nn, multiprocessing as mp
 from transformers import AutoModelForCausalLM
-
+import os
 from lib import codebook, utils
 from lib.linear import QuantizedLinear
 from . import ldlq
@@ -237,27 +237,34 @@ def infer(args, end_dev, n_layers, in_q, out_q):
 
 def finetune_susv_e2e(quant_model, start_dev, devset, orig_dtype, args):
 
-    in_q = mp.Queue()
-    out_q = mp.Queue()
-    p = mp.Process(target=infer,
-                   args=(args, start_dev, len(quant_model.model.layers), in_q,
-                         out_q))
-    p.start()
+
+    rank = int(os.environ["LOCAL_RANK"])
+    if rank == 0:
+        in_q = mp.Queue()
+        out_q = mp.Queue()
+        p = mp.Process(target=infer,
+                       args=(args, start_dev, len(quant_model.model.layers), in_q,
+                             out_q))
+        p.start()
+    
 
     train_dl, valid_dl = utils.split_data(devset, devset, args)
 
     optim = torch.optim.Adam(quant_model.parameters(), lr=args.ft_lr)
 
-    best_loss = utils.calculate_ce_loss_model(quant_model, valid_dl, start_dev,
-                                              in_q, out_q)
+    if rank == 0:
+        best_loss = utils.calculate_ce_loss_model(quant_model, valid_dl, start_dev,
+                                                  in_q, out_q)
+        glog.info(f'initial loss {best_loss}')
+        
     scaler = torch.cuda.amp.GradScaler(enabled=True)
 
     best_sd = copy.deepcopy(quant_model.state_dict())
-    glog.info(f'initial loss {best_loss}')
     worse_ct = 0
     for epoch in range(args.ft_epochs):
         for bidx, (source, _) in enumerate(train_dl):
-            in_q.put(source)
+            if rank == 0:
+                in_q.put(source)
             with torch.autocast(device_type='cuda',
                                 dtype=orig_dtype,
                                 enabled=True):
@@ -275,8 +282,9 @@ def finetune_susv_e2e(quant_model, start_dev, devset, orig_dtype, args):
                 optim.zero_grad()
 
         if epoch % args.ft_valid_freq == (args.ft_valid_freq - 1):
-            test_loss = utils.calculate_ce_loss_model(quant_model, valid_dl,
-                                                      start_dev, in_q, out_q)
+            if rank == 0:
+                test_loss = utils.calculate_ce_loss_model(quant_model, valid_dl,
+                                                          start_dev, in_q, out_q)
             if test_loss < best_loss:
                 glog.info(
                     f'epoch {epoch} new loss {test_loss} old loss {best_loss} BETTER'
@@ -292,7 +300,8 @@ def finetune_susv_e2e(quant_model, start_dev, devset, orig_dtype, args):
                 if worse_ct >= args.ft_early_stop:
                     break
 
-    in_q.put(None)
-    p.join()
+    if rank == 0:
+        in_q.put(None)
+        p.join()
     with torch.no_grad():
         quant_model.load_state_dict(best_sd)
