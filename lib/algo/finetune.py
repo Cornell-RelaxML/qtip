@@ -129,7 +129,8 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         if has_kernel:
             packed = packed.view(torch.uint8).view(-1, 2).flip((-1,)).reshape(
                 m // 16 // 2, 2, n // 16 // 2, 2, 16 * 16 // 8, args.K).permute(
-                    0, 2, 4, 3, 1, 5).flip((-1,)).contiguous().flatten().view(torch.int16)
+                    0, 2, 4, 3, 1, 5).flip((-1,)).contiguous().flatten().view(
+                        torch.int16).reshape(packed.shape)
 
         Wr *= Wscale
         hatWr *= Wscale
