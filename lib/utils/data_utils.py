@@ -27,22 +27,20 @@ def sym_to_flat(A):
 def register_input_H_hook(module, device):
     n = module.in_features
     H = torch.zeros(n, n, dtype=torch.float64, device=device)
-    mu = torch.zeros(n, dtype=torch.float64, device=device)
     ct = 0
 
     def H_hook(module, x):
-        nonlocal H, mu, ct, n
+        nonlocal H, ct, n
         x = x[0].reshape(-1, n).to(torch.float64)
-        mu.add_(x.sum(dim=0))
         H.addmm_(x.T, x)
         ct += len(x)
 
     hook = module.register_forward_pre_hook(H_hook)
 
     def done():
-        nonlocal H, mu, ct, hook
+        nonlocal H, ct, hook
         hook.remove()
-        return H.cpu(), mu.cpu(), ct
+        return H.cpu(), ct
 
     return done
 

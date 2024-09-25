@@ -21,7 +21,7 @@ from lib import utils
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--batch_size', default=2, type=int)
-parser.add_argument('--large_batch_size', default=2048, type=int)
+parser.add_argument('--large_batch_size', default=512, type=int)
 parser.add_argument('--devset_size', default=8192, type=int)
 parser.add_argument('--ctx_size', default=4096, type=int)
 parser.add_argument('--base_model',
@@ -32,7 +32,7 @@ parser.add_argument('--scratch_path', default=None, type=str)
 parser.add_argument('--async_copy_speed', default=-1, type=int)
 parser.add_argument('--act_save_rate', default=4, type=int)
 parser.add_argument('--save_activations', action='store_true')
-parser.add_argument('--sample_proc', default=4, type=int)
+parser.add_argument('--sample_proc', default=32, type=int)
 
 
 
@@ -53,6 +53,8 @@ def forward_layer(layer, position_ids, attention_mask, bs, device, in_q,
             layer = layer.cpu()
             position_ids = position_ids.cpu()
             attention_mask = attention_mask.cpu()
+            del layer, position_ids, attention_mask
+            utils.clean()
             out_q.put({
                 'qkv': done_qkv(),
                 'o': done_o(),
@@ -70,7 +72,6 @@ def forward_layer(layer, position_ids, attention_mask, bs, device, in_q,
 
 def accumulate(in_q, move_q, ngpus, args, transformer_layer_index):
     Hs = {}
-    mus = {}
     cts = {}
 
     for i in range(ngpus):
@@ -79,17 +80,13 @@ def accumulate(in_q, move_q, ngpus, args, transformer_layer_index):
             for key in out:
                 Hs[key] = torch.zeros(out[key][0].shape,
                                       dtype=out[key][0].dtype)
-                mus[key] = torch.zeros(out[key][1].shape,
-                                       dtype=out[key][1].dtype)
                 cts[key] = 0
         for key in out:
             Hs[key].add_(out[key][0])
-            mus[key].add_(out[key][1])
-            cts[key] += out[key][2]
+            cts[key] += out[key][1]
 
     keys = list(Hs.keys())
-
-    for key in Hs:
+    for key in keys:
         save_path = f"{args.save_path}/{transformer_layer_index}_{key}.pt"
         flatH = utils.sym_to_flat(Hs[key])
         if os.path.exists(save_path):
@@ -109,14 +106,14 @@ def accumulate(in_q, move_q, ngpus, args, transformer_layer_index):
                 'ct': total_ct,
             }, save_path)
 
-    del Hs, mus, cts, out
+        del flatH, Hkey, Hs[key]
+                                 
+    del Hs, cts, out
+    utils.clean()
 
 
 def main(args):
     print("loading model...")
-    model = AutoModelForCausalLM.from_pretrained(args.base_model,
-                                                 torch_dtype="auto",
-                                                 low_cpu_mem_usage=True)
     print("loaded model!")
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, use_fast=False)
     tokenizer.pad_token = tokenizer.eos_token
@@ -128,6 +125,10 @@ def main(args):
                                       nproc=args.sample_proc)
     devset = torch.split(devset, args.large_batch_size)
     for lbi in range(len(devset)):
+        model = AutoModelForCausalLM.from_pretrained(args.base_model,
+                                                     torch_dtype="auto",
+                                                     low_cpu_mem_usage=True)
+        
         print(f'processing split {lbi}')
         lbs = torch.split(devset[lbi], args.batch_size)
         dev_emb = [model.model.embed_tokens(chunk) for chunk in lbs]
@@ -191,11 +192,15 @@ def main(args):
             accumulate_proc.join()
 
             transformer_layer.cpu()
+            del transformer_layer
             utils.clean()
 
             print(f"done processing layer {transformer_layer_index}")
             
         del dev_emb, lbs
+        utils.clean()
+        model.cpu()
+        del model
         utils.clean()
 
 if __name__ == "__main__":
