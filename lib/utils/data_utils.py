@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from lib import codebook
 
 from .matmul_had import matmul_hadU
-
+from .misc import clean
 
 def flat_to_sym(V, N):
     A = torch.zeros(N, N, dtype=V.dtype, device=V.device)
@@ -24,7 +24,7 @@ def sym_to_flat(A):
     return A[idxs.unbind()]
 
 
-def register_input_H_hook(module, device):
+def register_input_H_hook(module, save_pfx, device):
     n = module.in_features
     H = torch.zeros(n, n, dtype=torch.float64, device=device)
     ct = 0
@@ -39,8 +39,17 @@ def register_input_H_hook(module, device):
 
     def done():
         nonlocal H, ct, hook
+        H = H.cpu()
+        save_path = f"{save_pfx}_{device}.pt"
+        flatH = sym_to_flat(H)
+        torch.save({
+            'flatH': flatH,
+            'n': H.shape[0],
+            'ct': ct}, save_path)
+        del H, flatH, ct
         hook.remove()
-        return H.cpu(), ct
+        del hook
+        clean()
 
     return done
 

@@ -72,31 +72,30 @@ def main(args):
         attention_mask = attention_mask.cuda()
         
         for transformer_layer_index in range(len(model.model.layers)):
-            layer = model.model.layers[transformer_layer_index].cuda()
-            done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj, device)
-            done_o = utils.register_input_H_hook(layer.self_attn.o_proj, device)
-            done_up = utils.register_input_H_hook(layer.mlp.up_proj, device)
-            done_down = utils.register_input_H_hook(layer.mlp.down_proj, device)
+            layer = model.model.layers[transformer_layer_index]
+            layer = layer.cuda()
+            save_pfx = f'{args.save_path}/{transformer_layer_index}'
+            done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj, f'{save_pfx}_qkv', gpu_id)
+            done_o = utils.register_input_H_hook(layer.self_attn.o_proj, f'{save_pfx}_o', gpu_id)
+            done_up = utils.register_input_H_hook(layer.mlp.up_proj, f'{save_pfx}_up', gpu_id)
+            done_down = utils.register_input_H_hook(layer.mlp.down_proj, f'{save_pfx}_down', gpu_id)
             for di in range(len(dev_emb)):
+                tmp_input = dev_emb[di].cuda()
                 dev_emb[di] = layer(dev_emb[di].cuda(),
                                     position_ids=position_ids,
                                     attention_mask=attention_mask,
                                     use_cache=False,
                                     output_attentions=False)[0].cpu()
-            layer.cpu()
-            del layer
+                tmp_input = tmp_input.cpu()
+                del tmp_input
+                utils.clean()
+            layer = layer.cpu()
+            del layer, model.model.layers[transformer_layer_index]
             utils.clean()
             fn_dict = {'qkv':done_qkv, 'o':done_o,
                        'up': done_up, 'down': done_down}
             for key in fn_dict:
-                H, ct = fn_dict[key]()
-                save_path = f"{args.save_path}/{transformer_layer_index}_{key}_{gpu_id}.pt"
-                flatH = utils.sym_to_flat(H)
-                torch.save({
-                    'flatH': flatH.cpu(),
-                    'n': H.shape[0],
-                    'ct': ct}, save_path)
-                del H, flatH, ct
+                fn_dict[key]()
                 utils.clean()
             dist.barrier()
             if gpu_id == 0:
@@ -132,8 +131,6 @@ def main(args):
             
             print(f"done processing layer {transformer_layer_index}")
 
-        position_ids = position_ids.cpu()
-        attention_mask = attention_mask.cpu()
         del position_ids, attention_mask
             
         del dev_emb, lbs
