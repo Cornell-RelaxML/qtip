@@ -39,14 +39,12 @@ def register_input_H_hook(module, save_pfx, device):
 
     def done():
         nonlocal H, ct, hook
-        H = H.cpu()
         save_path = f"{save_pfx}_{device}.pt"
-        flatH = sym_to_flat(H)
         torch.save({
-            'flatH': flatH,
+            'H': H,
             'n': H.shape[0],
             'ct': ct}, save_path)
-        del H, flatH, ct
+        del H, ct
         hook.remove()
         del hook
         clean()

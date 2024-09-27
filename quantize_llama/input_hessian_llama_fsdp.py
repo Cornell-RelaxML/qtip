@@ -50,7 +50,6 @@ def main(args):
         model = AutoModelForCausalLM.from_pretrained(args.base_model,
                                                      torch_dtype="auto",
                                                      low_cpu_mem_usage=True)
-        
         print(f'processing split {lbi}')
         dev_emb = model.model.embed_tokens(devset[lbi].view(-1, args.batch_size, args.ctx_size))
 
@@ -72,6 +71,7 @@ def main(args):
         attention_mask = attention_mask.cuda()
         
         for transformer_layer_index in range(len(model.model.layers)):
+            print(gpu_id, 1)
             layer = model.model.layers[transformer_layer_index]
             layer = layer.cuda()
             save_pfx = f'{args.save_path}/{transformer_layer_index}'
@@ -79,6 +79,7 @@ def main(args):
             done_o = utils.register_input_H_hook(layer.self_attn.o_proj, f'{save_pfx}_o', gpu_id)
             done_up = utils.register_input_H_hook(layer.mlp.up_proj, f'{save_pfx}_up', gpu_id)
             done_down = utils.register_input_H_hook(layer.mlp.down_proj, f'{save_pfx}_down', gpu_id)
+            print(gpu_id, 2)
             for di in range(len(dev_emb)):
                 tmp_input = dev_emb[di].cuda()
                 dev_emb[di] = layer(dev_emb[di].cuda(),
@@ -89,6 +90,7 @@ def main(args):
                 tmp_input = tmp_input.cpu()
                 del tmp_input
                 utils.clean()
+            print(gpu_id, 3)
             layer = layer.cpu()
             del layer, model.model.layers[transformer_layer_index]
             utils.clean()
@@ -98,6 +100,7 @@ def main(args):
                 fn_dict[key]()
                 utils.clean()
             dist.barrier()
+            print(gpu_id, 4)
             if gpu_id == 0:
                 for key in fn_dict:
                     save_path = f"{args.save_path}/{transformer_layer_index}_{key}.pt"
@@ -112,12 +115,14 @@ def main(args):
                         print(gi_path)
                         d2 = torch.load(gi_path, map_location=torch.device('cpu'))
                         if data is not None:
-                            data['flatH'] += d2['flatH']
+                            data['flatH'] += utils.sym_to_flat(d2['H'])
                             data['ct'] += d2['ct']
                             del d2
                             utils.clean()
                         else:
                             data = d2
+                            data['flatH'] = utils.sym_to_flat(data['H'])
+                            del data['H']
                         os.remove(gi_path)
                         gi += 1
                         gi_path = f"{args.save_path}/{transformer_layer_index}_{key}_{gi}.pt"

@@ -1,9 +1,9 @@
 # This script reproduces the example models.
 
-CKPT=/data_persistent3/alberttseng/qtip_examples/ckpt
-HF=/data_persistent3/alberttseng/qtip_examples/hfized
-LOG=/data_persistent3/alberttseng/qtip_examples/logs
-HESS=/data_persistent3/restoration/mk-1-20240603/hessians
+CKPT=/scratch/alberttseng/qtip_examples/ckpt
+HF=/scratch/alberttseng/qtip_examples/hfized
+LOG=/scratch/alberttseng/qtip_examples/logs
+HESS=/scratch/restoration/mk-1-20240603/hessians
 
 mkdir $CKPT
 mkdir $LOG
@@ -122,13 +122,14 @@ wait
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-7b-hf --hf_path $HF/2_7b_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_7b_4bit >> $LOG/2_7b_4bit 2>&1
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-7b-chat-hf --hf_path $HF/2_7b_chat_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_7b_chat_4bit >> $LOG/2_7b_chat_4bit 2>&1
 
+'''
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-13b-hf --hf_path $HF/2_13b_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_13b_4bit >> $LOG/2_13b_4bit 2>&1
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-13b-chat-hf --hf_path $HF/2_13b_chat_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_13b_chat_4bit >> $LOG/2_13b_chat_4bit 2>&1
 
 
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-70b-hf --hf_path $HF/2_70b_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 8 --ft_bs 1 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_70b_4bit --ft_grad_ckpt >> $LOG/2_70b_4bit 2>&1
 python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Llama-2-70b-chat-hf --hf_path $HF/2_70b_chat_4bit --devset_size 640 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 8 --ft_bs 1 --ctx_size 4096 --ft_train_lut --hf_output_path $HF/2_70b_chat_4bit --ft_grad_ckpt >> $LOG/2_70b_chat_4bit 2>&1
-
+'''
 
 CUDA_VISIBLE_DEVICES=0 python -m eval.eval_ppl  --hf_path $HF/2_7b_4bit >> $LOG/2_7b_4bit 2>&1 &
 CUDA_VISIBLE_DEVICES=1 python -m eval.eval_ppl  --hf_path $HF/2_7b_chat_4bit >> $LOG/2_7b_chat_4bit 2>&1 &
