@@ -7,6 +7,8 @@ QTIP uses incoherence processing to make LLM weight matrices approximately i.i.d
 QTIP solves naive TCQ's inherent slowness by introducing a series of novel compute-based codes for use with the "bitshift trellis."
 For more details, please see the [paper](https://arxiv.org/abs/2406.11235).
 
+**👉 QTIP will appear at NeurIPS 2024 as a Spotlight! Feel free to reach out if you'll be attending as well.**
+
 ## How to use this codebase
 
 This codebase is based off of the [QuIP#](https://github.com/Cornell-RelaxML/quip-sharp) codebase, with modifications made to support trellis quantization.
@@ -46,16 +48,7 @@ python setup.py install
 
 ## Prequantized Models
 
-Below are some prequantized Llama 2 models using QTIP with the HYB code, L=16, V=2, and K (bitrate) = 2. These models are compatible with the inference kernels in `qtip-kernels` and can be used by passing in the HF Hub path to the `--hf-path` flag in the eval scripts.
-
-| Model            | HF Hub Repo                        | W2 PPL | C4 PPL | ArcC | ArcE | BoolQ | PiQA | Winogrande |
-|------------------|------------------------------------|:------:|:------:|:----:|:----:|:-----:|:----:|:----------:|
-| Llama 2 7B       | relaxml/Llama-2-7b-QTIP-2Bit       |  5.86  |  7.73  | 0.36 | 0.66 |  0.67 | 0.76 |    0.65    |
-| Llama 2 7B chat  | relaxml/Llama-2-7b-chat-QTIP-2Bit  |  7.00  |  9.35  | 0.38 | 0.69 |  0.78 | 0.76 |    0.65    |
-| Llama 2 13B      | relaxml/Llama-2-13b-QTIP-2Bit      |  5.11  |  6.85  | 0.41 | 0.71 |  0.65 | 0.77 |    0.68    |
-| Llama 2 13B chat | relaxml/Llama-2-13b-chat-QTIP-2Bit |  6.04  |  8.15  | 0.43 | 0.72 |  0.82 | 0.77 |    0.69    |
-| Llama 2 70B      | relaxml/Llama-2-70b-QTIP-2Bit      |  3.70  |  5.48  | 0.48 | 0.76 |  0.76 | 0.80 |    0.75    |
-| Llama 2 70B chat | relaxml/Llama-2-70b-chat-QTIP-2Bit |  4.66  |  6.71  | 0.49 | 0.76 |  0.86 | 0.80 |    0.75    |
+Prequantized QTIP models with the HYB code, L=16, and V=2 can be found [here](https://huggingface.co/collections/relaxml/qtip-quantized-models-66fa253ad3186746f4b62803). These models can be used by passing in the HF Hub path (e.g. `relaxml/Llama-2-7b-QTIP-2Bit`) to the `--hf-path` flag in the eval scripts.
 
 ## Other
 
