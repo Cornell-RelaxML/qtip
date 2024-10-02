@@ -3,7 +3,7 @@
 CKPT=/scratch/alberttseng/qtip_examples/ckpt
 HF=/scratch/alberttseng/qtip_examples/hfized
 LOG=/scratch/alberttseng/qtip_examples/logs
-HESS=/scratch/restoration/mk-1-20240603/hessians
+HESS=/scratch/alberttseng/hessians
 
 mkdir $CKPT
 mkdir $LOG

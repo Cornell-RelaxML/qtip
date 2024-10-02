@@ -69,10 +69,11 @@ def main(args):
 
         position_ids = position_ids.cuda()
         attention_mask = attention_mask.cuda()
-        
-        for transformer_layer_index in range(len(model.model.layers)):
+
+        transformer_layer_index = 0
+        while len(model.model.layers) > 0:
             print(gpu_id, 1)
-            layer = model.model.layers[transformer_layer_index]
+            layer = model.model.layers[0]
             layer = layer.cuda()
             save_pfx = f'{args.save_path}/{transformer_layer_index}'
             done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj, f'{save_pfx}_qkv', gpu_id)
@@ -92,7 +93,7 @@ def main(args):
                 utils.clean()
             print(gpu_id, 3)
             layer = layer.cpu()
-            del layer, model.model.layers[transformer_layer_index]
+            del layer, model.model.layers[0]
             utils.clean()
             fn_dict = {'qkv':done_qkv, 'o':done_o,
                        'up': done_up, 'down': done_down}
@@ -135,13 +136,15 @@ def main(args):
             dist.barrier()
             
             print(f"done processing layer {transformer_layer_index}")
-
+            transformer_layer_index += 1
+            
         del position_ids, attention_mask
             
-        del dev_emb, lbs
+        del dev_emb
         utils.clean()
         del model
         utils.clean()
+        
 
 if __name__ == "__main__":
     #mp.set_start_method('spawn')
