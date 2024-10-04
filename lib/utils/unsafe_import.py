@@ -26,11 +26,14 @@ def model_from_hf_path(path,
         model_cls = transformers.AutoModelForCausalLM
         model_str = path
 
+    #mmap = {i:"70GiB" for i in range(8)}
+    #mmap['cpu'] = '500GiB'
     model = model_cls.from_pretrained(
         path,
         torch_dtype='auto',
         low_cpu_mem_usage=True,
         attn_implementation='sdpa',
         device_map=device_map)
+    #max_memory=mmap)
 
     return model, model_str

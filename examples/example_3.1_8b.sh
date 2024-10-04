@@ -10,7 +10,7 @@ HESS=/scratch/3.1hessians8b
 mkdir $CKPT
 mkdir $LOG
 mkdir $HF
-
+'''
 python -m quantize_llama.quantize_finetune_llama \
        --save_path $CKPT/3.1_8b_2bit \
        --codebook bitshift \
@@ -72,12 +72,14 @@ CUDA_VISIBLE_DEVICES=1 python -m quantize_llama.hfize_llama --quantized_path $CK
 CUDA_VISIBLE_DEVICES=2 python -m quantize_llama.hfize_llama --quantized_path $CKPT/3.1_8b_4bit --hf_output_path $HF/3.1_8b_4bit >> $LOG/3.1_8b_4bit 2>&1 &
 
 wait
+'''
 
-python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_2bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_2bit >> $LOG/3.1_8b_2bit 2>&1
 
-python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_3bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_3bit >> $LOG/3.1_8b_3bit 2>&1
+python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_2bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 8 --ft_bs 1 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_2bit >> $LOG/3.1_8b_2bit 2>&1
 
-python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_4bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 4 --ft_bs 2 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_4bit >> $LOG/3.1_8b_4bit 2>&1
+python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_3bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 8 --ft_bs 1 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_3bit >> $LOG/3.1_8b_3bit 2>&1
+
+python -m quantize_llama.finetune_e2e_llama --base_model meta-llama/Meta-Llama-3.1-8B --hf_path $HF/3.1_8b_4bit --devset_size 1024 --ft_valid_size 128 --ft_epochs 4 --ft_update_freq 8 --ft_bs 1 --ctx_size 8192 --ft_train_lut --hf_output_path $HF/3.1_8b_4bit >> $LOG/3.1_8b_4bit 2>&1
 
 
 CUDA_VISIBLE_DEVICES=0 python -m eval.eval_ppl --seqlen 8192 --hf_path meta-llama/Meta-Llama-3.1-8B >> $LOG/3.1_8b_bf16 2>&1 &
