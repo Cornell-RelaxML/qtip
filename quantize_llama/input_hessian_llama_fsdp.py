@@ -75,7 +75,7 @@ def main(args):
             print(gpu_id, 1)
             layer = model.model.layers[0]
             layer = layer.cuda()
-            save_pfx = f'{args.save_path}/{transformer_layer_index}'
+            save_pfx = f'/dev/shm/{transformer_layer_index}'
             done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj, f'{save_pfx}_qkv', gpu_id)
             done_o = utils.register_input_H_hook(layer.self_attn.o_proj, f'{save_pfx}_o', gpu_id)
             done_up = utils.register_input_H_hook(layer.mlp.up_proj, f'{save_pfx}_up', gpu_id)
@@ -111,7 +111,7 @@ def main(args):
                     else:
                         data = None
                     gi = 0
-                    gi_path = f"{args.save_path}/{transformer_layer_index}_{key}_{gi}.pt"
+                    gi_path = f"/dev/shm/{transformer_layer_index}_{key}_{gi}.pt"
                     while os.path.exists(gi_path):
                         print(gi_path)
                         d2 = torch.load(gi_path, map_location=torch.device('cpu'))
@@ -126,7 +126,7 @@ def main(args):
                             del data['H']
                         os.remove(gi_path)
                         gi += 1
-                        gi_path = f"{args.save_path}/{transformer_layer_index}_{key}_{gi}.pt"
+                        gi_path = f"/dev/shm/{transformer_layer_index}_{key}_{gi}.pt"
                     data['flatH'] /= data['ct']
                     data['flatH'] = data['flatH'].float()
                     torch.save(data, save_path)
