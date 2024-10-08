@@ -658,10 +658,10 @@ class LlamaSdpaAttention(LlamaAttention):
         is_causal = True if causal_mask is None and q_len > 1 else False
 
         attn_output = torch.nn.functional.scaled_dot_product_attention(
-            query_states,
+            query_states.to(key_states.device),
             key_states,
             value_states,
-            attn_mask=causal_mask,
+            attn_mask=causal_mask.to(key_states.device),
             dropout_p=self.attention_dropout if self.training else 0.0,
             is_causal=is_causal,
         )

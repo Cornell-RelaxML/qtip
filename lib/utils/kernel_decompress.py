@@ -1,6 +1,6 @@
 import torch
 
-@torch.compile
+#@torch.compile
 def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
     if compressed.dtype != torch.uint16:
         compressed = compressed.view(torch.uint16)

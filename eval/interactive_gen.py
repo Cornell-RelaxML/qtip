@@ -8,8 +8,8 @@ from transformers import AutoTokenizer, StaticCache
 
 from lib.utils.unsafe_import import model_from_hf_path
 torch.set_grad_enabled(False)
-torch.set_float32_matmul_precision('high')
-torch.backends.cuda.matmul.allow_tf32 = True
+#torch.set_float32_matmul_precision('high')
+#torch.backends.cuda.matmul.allow_tf32 = True
 
 def multinomial_sample_one_no_sync(probs_sort): # Does multinomial sampling without a cuda synchronization
     q = torch.empty_like(probs_sort).exponential_(1)
@@ -33,6 +33,8 @@ def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
 @torch.no_grad()
 def decode_one_tokens(model, cur_token, past_kv, cache_position):
     logits = model(cur_token, past_key_values=past_kv, cache_position=cache_position)[0]
+    print(logits[..., :8])
+    exit()
     new_token = sample(logits,temperature=0.6, top_k=5)[0]
     return new_token, logits
 
@@ -47,7 +49,11 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     )
     generated_ids[:, cache_position] = inputs["input_ids"].to(model.device).to(torch.int)
     logits = model(**inputs, past_key_values=past_kv, cache_position=cache_position)[0]
+    print(logits)
+
     next_token, _ = sample(logits, top_k=top_k)
+    next_token[0, 0] = 1234
+    
     generated_ids[:, seq_length] = next_token
     callback(next_token)
 
@@ -70,7 +76,7 @@ def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
     device = "cuda"
     model, model_str = model_from_hf_path(
         hf_path,
-        device_map='cuda:0')
+        device_map='auto')#'cuda:0')
 
     tokenizer = AutoTokenizer.from_pretrained(model_str)
     tokenizer.pad_token = tokenizer.eos_token
@@ -86,14 +92,13 @@ def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
         decode_one_tokens = torch.compile(decode_one_tokens, mode="max-autotune", fullgraph=True)
 
     text = "This is a test of this large language model"
-    ids, text, _ = generate(model, tokenizer, text, 16, top_k, callback, past_kv)
+    ids, text, _ = generate(model, tokenizer, text, 1, top_k, callback, past_kv)
     
         
     while True:
         prompt = input("What is your prompt? ")
         if prompt == 'quit':
             exit()
-
         if tokenizer.chat_template is not None:
             messages = [{"role": "user", "content": prompt}]
             text = tokenizer.apply_chat_template(
