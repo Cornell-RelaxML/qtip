@@ -434,7 +434,19 @@ class BitshiftLinear(nn.Module):
                     print('lut', self.cb.lut)
                     print(pre_x.to(w.dtype) @ w.T)
                     print(m,n)
+                    torch.save({
+                        'x': pre_x,
+                        'trellis': trellis,
+                        'm': m,
+                        'n': n,
+                        'lut': self.cb.lut,
+                        'torch_w': w,
+                        'torch_y': pre_x.to(w.dtype) @ w.T,
+                        'kernel_y': x,
+                    }, '/tmp/data.pt')
+
                     exit()
+                    
             else:
                 if mode == 'train-recons':
                     self.cb.recons_lut()
