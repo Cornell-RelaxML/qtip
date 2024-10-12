@@ -399,6 +399,7 @@ class BitshiftLinear(nn.Module):
             matmul_hadU_cuda(hatW.float() / self.scale, had_left, K_left).T,
             had_right, K_right).T.contiguous().to(self.internal_dtype)
 
+    @torch.compile(mode='max-autotune', fullgraph=True)
     def forward(self,
                 input,
                 trellis,
@@ -418,39 +419,13 @@ class BitshiftLinear(nn.Module):
             x = (x.to(self.internal_dtype) @ self.hatW.T).float()
         else:
             bs = x.shape[0]
-            preprex = x.clone()
             x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
-            if True and bs == 1 and self.has_kernel:
+            if bs == 1 and self.has_kernel:
                 wrapper = getattr(
                     torch.ops.quip_lib,
                     f"decompress_matvec_qtip_{m}_1_{x.numel()}_{self.cb.K}")
 
-                pre_x = x.clone()
                 x = wrapper(trellis, x, self.cb.tlut)
-               
-                if x.isnan().any():
-                    print(preprex)
-                    print(pre_x)
-                    print(trellis)
-                    w = self.get_hatW_kernel(trellis, m, n, round=False)
-                    print(w)
-                    print(x)
-                    print('lut', self.cb.lut)
-                    print(pre_x.to(w.dtype) @ w.T)
-                    print(m,n)
-                    torch.save({
-                        'x': pre_x,
-                        'trellis': trellis,
-                        'm': m,
-                        'n': n,
-                        'lut': self.cb.lut,
-                        'tlut': self.cb.tlut,
-                        'torch_w': w,
-                        'torch_y': pre_x.to(w.dtype) @ w.T,
-                        'kernel_y': x,
-                    }, '/tmp/data.pt')
-
-                    exit()
                
             else:
                 if mode == 'train-recons':
@@ -464,17 +439,6 @@ class BitshiftLinear(nn.Module):
                             trellis, self.td_x * self.td_y)
                     hatW = self.get_hatW(trellis, m, n, round=False)
                 x = (x.to(hatW.dtype) @ hatW.T).float()
-                '''
-                if bs == 1:
-                    wrapper = getattr(
-                        torch.ops.quip_lib,
-                        f"decompress_matvec_qtip_{m}_1_{x.numel()}_{self.cb.K}")
-                    y2 = wrapper(trellis, x, self.cb.tlut)
-                    print('kernel fp32 out', y2)
-                    print('kernel to 16 to 32', y2.to(torch.float16).float())
-                    print('torch to 32', y)
-                    exit()
-                '''
                 
             x = matmul_hadU_cuda(x, had_right, K_right)
 

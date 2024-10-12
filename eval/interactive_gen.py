@@ -70,9 +70,7 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
 
 def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
     device = "cuda"
-    model, model_str = model_from_hf_path(
-        hf_path,
-        device_map='auto')#'cuda:0')
+    model, model_str = model_from_hf_path(hf_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_str)
     tokenizer.pad_token = tokenizer.eos_token
