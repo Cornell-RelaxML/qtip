@@ -43,6 +43,7 @@ parser.add_argument('--ft_valid_freq', default=1, type=int)
 parser.add_argument('--ft_valid_size', default=128, type=float)
 parser.add_argument('--ft_early_stop', default=3, type=int)
 parser.add_argument('--ft_train_lut', action='store_true')
+parser.add_argument('--ft_prefetch_trellis', action='store_true')
 parser.add_argument('--ft_grad_ckpt', action='store_true')
 
 
@@ -96,7 +97,13 @@ def main(args):
             module.SV = nn.Parameter(module.SV.float(), requires_grad=True)
             if module.tlut is not None and args.ft_train_lut:
                 module.tlut.requires_grad = True
-            module.mode = 'train-recons' if args.ft_train_lut else 'train-fixW'
+            if args.ft_train_lut:
+                module.mode = 'train-recons'
+                glog.info('overriding ft_prefetch_trellis')
+            elif args.ft_prefetch_trellis:
+                module.mode = 'train-fixW'
+            else:
+                module.mode = 'eval'
             module.grad_ckpt = args.ft_grad_ckpt
     utils.clean()
     with torch.enable_grad():

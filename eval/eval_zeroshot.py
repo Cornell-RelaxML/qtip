@@ -7,9 +7,10 @@ import datasets
 import glog
 import torch
 from lm_eval import evaluator, tasks
+from lm_eval.models.huggingface import HFLM
 from transformers import AutoTokenizer
 
-from lib.utils import LMEvalAdaptor
+#from lib.utils import LMEvalAdaptor
 from lib.utils.unsafe_import import model_from_hf_path
 from lib.linear import QuantizedLinear
 
@@ -23,7 +24,9 @@ parser.add_argument("--tasks", type=str)
 parser.add_argument("--output_path", default=None, type=str)
 parser.add_argument('--num_fewshot', type=int, default=0)
 parser.add_argument('--limit', type=int, default=None)
-
+parser.add_argument('--apply_chat_template', action='store_true')
+parser.add_argument('--fewshot_as_multiturn', action='store_true')
+#parser.add_argument('--max_model_len', type=int)
 
 def main(args):
     model, model_str = model_from_hf_path(args.hf_path)
@@ -42,17 +45,27 @@ def main(args):
 
     task_names = args.tasks.split(",")
 
-    lm_eval_model = LMEvalAdaptor(model_str, model, tokenizer, args.batch_size)
+    lm_eval_model = HFLM(
+        model,
+        tokenizer=tokenizer)
+        
+    #lm_eval_model = LMEvalAdaptor(model_str, model, tokenizer, args.batch_size)
+    
     results = evaluator.simple_evaluate(
         model=lm_eval_model,
         tasks=task_names,
         batch_size=args.batch_size,
-        no_cache=True,
         limit=args.limit,
         num_fewshot=args.num_fewshot,
+        apply_chat_template=args.apply_chat_template,
+        fewshot_as_multiturn=args.fewshot_as_multiturn
     )
 
-    print(evaluator.make_table(results))
+    print(results['versions'])
+    print(results['transformers_version'])
+    print(results['n-shot'])
+    print(results['results'])
+    #print(evaluator.make_table(results))
 
     if args.output_path is not None:
         os.makedirs(os.path.dirname(args.output_path), exist_ok=True)

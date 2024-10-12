@@ -8,8 +8,8 @@ from transformers import AutoTokenizer, StaticCache
 
 from lib.utils.unsafe_import import model_from_hf_path
 torch.set_grad_enabled(False)
-torch.set_float32_matmul_precision('high')
-torch.backends.cuda.matmul.allow_tf32 = True
+#torch.set_float32_matmul_precision('high')
+#torch.backends.cuda.matmul.allow_tf32 = True
 
 def multinomial_sample_one_no_sync(probs_sort): # Does multinomial sampling without a cuda synchronization
     q = torch.empty_like(probs_sort).exponential_(1)
@@ -47,7 +47,9 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     )
     generated_ids[:, cache_position] = inputs["input_ids"].to(model.device).to(torch.int)
     logits = model(**inputs, past_key_values=past_kv, cache_position=cache_position)[0]
+
     next_token, _ = sample(logits, top_k=top_k)
+    
     generated_ids[:, seq_length] = next_token
     callback(next_token)
 
@@ -68,9 +70,7 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
 
 def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
     device = "cuda"
-    model, model_str = model_from_hf_path(
-        hf_path,
-        device_map='cuda:0')
+    model, model_str = model_from_hf_path(hf_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_str)
     tokenizer.pad_token = tokenizer.eos_token
@@ -86,14 +86,13 @@ def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
         decode_one_tokens = torch.compile(decode_one_tokens, mode="max-autotune", fullgraph=True)
 
     text = "This is a test of this large language model"
-    ids, text, _ = generate(model, tokenizer, text, 16, top_k, callback, past_kv)
+    ids, text, _ = generate(model, tokenizer, text, 8, top_k, callback, past_kv)
     
         
     while True:
         prompt = input("What is your prompt? ")
         if prompt == 'quit':
             exit()
-
         if tokenizer.chat_template is not None:
             messages = [{"role": "user", "content": prompt}]
             text = tokenizer.apply_chat_template(
@@ -136,6 +135,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_new_tokens', type=int, default=512, help='Maximum number of new tokens.')
     parser.add_argument('--top_k', type=int, default=32, help='Top-k for sampling.')
     parser.add_argument('--no_compile', action='store_true', help='Whether to compile the model.')
+    parser.add_argument('--enable_tf32', action='store_true', help='Whether to enable TF32 for FP32 matmuls.')
 
     args = parser.parse_args()
+
+    if args.enable_tf32:
+        torch.set_float32_matmul_precision('high')
+        
     main(args.hf_path, not args.no_compile, args.streaming, args.num_samples, args.max_new_tokens, args.top_k)

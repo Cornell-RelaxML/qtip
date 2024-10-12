@@ -8,6 +8,7 @@
 #include <cuda/pipeline>
 #include <cuda_fp16.h>
 #include <mma.h>
+#include <c10/cuda/CUDAStream.h>
 
 #include "inference.h"
 
@@ -463,7 +464,6 @@ __host__ static void decompress_matvec_ptr(
     cudaFuncSetAttribute(kernel_decompress_matvec<L, S, R, V, M, N, K>,
             cudaFuncAttributeMaxDynamicSharedMemorySize,
             smemCodebookSize);
-
 
     kernel_decompress_matvec<L, S, R, V, M, N, K><<<gridSize, blockSize, smemCodebookSize, stream>>>(out, compressed, x, codebook);
     

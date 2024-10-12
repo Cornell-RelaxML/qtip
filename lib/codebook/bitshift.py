@@ -370,7 +370,7 @@ class BitshiftLinear(nn.Module):
         self.td_y = td_y
         self.V = V
         self.cb = bitshift_codebook(L, K, V, tlut_bits, decode_mode, tlut=tlut)
-        self.dtype = dtype
+        self.internal_dtype = dtype
         self.has_kernel = has_kernel
         self.scale = 32
 
@@ -378,13 +378,14 @@ class BitshiftLinear(nn.Module):
         return self.cb.recons(unpacked_trellis).transpose(0, 1).transpose(
             1, 2).reshape(m // self.td_x, n // self.td_y, self.td_x,
                           self.td_y).transpose(1, 2).reshape(m,
-                                                             n).to(self.dtype)
+                                                             n)
 
-    def get_hatW_kernel(self, trellis, m, n):
-        return decode_compressed(self.cb.L, self.cb.tlut_bits, self.cb.K,
+    def get_hatW_kernel(self, trellis, m, n, round=True):
+        out =  decode_compressed(self.cb.L, self.cb.tlut_bits, self.cb.K,
                                  int(math.log2(self.V)), m, n,
                                  trellis.view(-1),
-                                 self.cb.lut.T).to(self.dtype)
+                                 self.cb.lut.T)
+        return out
 
     def cache_hatW(self, packed_trellis, had_left, had_right, K_left, K_right,
                    m, n):
@@ -396,7 +397,8 @@ class BitshiftLinear(nn.Module):
                 m, n)
         self.hatW = matmul_hadU_cuda(
             matmul_hadU_cuda(hatW.float() / self.scale, had_left, K_left).T,
-            had_right, K_right).to(self.dtype).T.contiguous().to(self.dtype)
+            had_right, K_right).T.contiguous().to(self.internal_dtype)
+
 
     def forward(self,
                 input,
@@ -414,7 +416,7 @@ class BitshiftLinear(nn.Module):
         x = x * SU
         
         if mode == 'train-fixW':
-            x = (x.to(self.dtype) @ self.hatW.T).float()
+            x = (x.to(self.internal_dtype) @ self.hatW.T).float()
         else:
             bs = x.shape[0]
             x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
@@ -422,7 +424,9 @@ class BitshiftLinear(nn.Module):
                 wrapper = getattr(
                     torch.ops.quip_lib,
                     f"decompress_matvec_qtip_{m}_1_{x.numel()}_{self.cb.K}")
+
                 x = wrapper(trellis, x, self.cb.tlut)
+               
             else:
                 if mode == 'train-recons':
                     self.cb.recons_lut()
@@ -433,10 +437,10 @@ class BitshiftLinear(nn.Module):
                     if mode == 'eval':
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
-                    hatW = self.get_hatW(trellis, m, n)
-                x = (x.to(self.dtype) @ hatW.T).float()
-
+                    hatW = self.get_hatW(trellis, m, n, round=False)
+                x = (x.to(hatW.dtype) @ hatW.T).float()
+                
             x = matmul_hadU_cuda(x, had_right, K_right)
 
-        x = x * (SV * self.scale)
+        x = x.to(SV.device) * (SV * self.scale)
         return x.view(*input.shape[:-1], m).to(input.dtype)
