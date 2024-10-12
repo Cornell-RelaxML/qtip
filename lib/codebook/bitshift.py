@@ -399,7 +399,7 @@ class BitshiftLinear(nn.Module):
             matmul_hadU_cuda(hatW.float() / self.scale, had_left, K_left).T,
             had_right, K_right).T.contiguous().to(self.internal_dtype)
 
-    @torch.compile(mode='max-autotune', fullgraph=True)
+
     def forward(self,
                 input,
                 trellis,

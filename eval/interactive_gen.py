@@ -86,7 +86,7 @@ def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
         decode_one_tokens = torch.compile(decode_one_tokens, mode="max-autotune", fullgraph=True)
 
     text = "This is a test of this large language model"
-    ids, text, _ = generate(model, tokenizer, text, 1, top_k, callback, past_kv)
+    ids, text, _ = generate(model, tokenizer, text, 8, top_k, callback, past_kv)
     
         
     while True:
@@ -135,6 +135,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_new_tokens', type=int, default=512, help='Maximum number of new tokens.')
     parser.add_argument('--top_k', type=int, default=32, help='Top-k for sampling.')
     parser.add_argument('--no_compile', action='store_true', help='Whether to compile the model.')
+    parser.add_argument('--enable_tf32', action='store_true', help='Whether to enable TF32 for FP32 matmuls.')
 
     args = parser.parse_args()
+
+    if args.enable_tf32:
+        torch.set_float32_matmul_precision('high')
+        
     main(args.hf_path, not args.no_compile, args.streaming, args.num_samples, args.max_new_tokens, args.top_k)

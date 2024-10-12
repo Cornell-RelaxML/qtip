@@ -130,7 +130,7 @@ class QuantizedLinear(nn.Module):
                                      self.had_right,
                                      self.K_left,
                                      self.K_right,
-                                     mode=self.mode)
+                                     mode=self.mode) + 0
         if self.bias is not None:
             return result + self.bias
         return result
