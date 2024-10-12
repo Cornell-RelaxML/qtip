@@ -33,8 +33,6 @@ def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
 @torch.no_grad()
 def decode_one_tokens(model, cur_token, past_kv, cache_position):
     logits = model(cur_token, past_key_values=past_kv, cache_position=cache_position)[0]
-    print(logits[..., :8])
-    exit()
     new_token = sample(logits,temperature=0.6, top_k=5)[0]
     return new_token, logits
 
@@ -49,10 +47,8 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     )
     generated_ids[:, cache_position] = inputs["input_ids"].to(model.device).to(torch.int)
     logits = model(**inputs, past_key_values=past_kv, cache_position=cache_position)[0]
-    print(logits)
 
     next_token, _ = sample(logits, top_k=top_k)
-    next_token[0, 0] = 1234
     
     generated_ids[:, seq_length] = next_token
     callback(next_token)

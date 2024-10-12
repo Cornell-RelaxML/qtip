@@ -2,14 +2,15 @@
 
 import json
 import os
+import torch
 
 import transformers
+import accelerate
 
 from model.llama import LlamaForCausalLM
 
 
-def model_from_hf_path(path,
-                       device_map='auto'):
+def model_from_hf_path(path, device_map=None):
 
     # AutoConfig fails to read name_or_path correctly
     bad_config = transformers.AutoConfig.from_pretrained(path)
@@ -26,14 +27,21 @@ def model_from_hf_path(path,
         model_cls = transformers.AutoModelForCausalLM
         model_str = path
 
-    #mmap = {i:"70GiB" for i in range(8)}
-    #mmap['cpu'] = '500GiB'
+        
+    mmap = {i:f"{torch.cuda.mem_get_info(i)[1]*0.7/(1 << 30)}GiB" for i in range(torch.cuda.device_count())}
+    print(mmap)
+    model = model_cls.from_pretrained(
+        path,
+        torch_dtype='auto',
+        low_cpu_mem_usage=True,
+        attn_implementation='sdpa')
+    device_map = accelerate.infer_auto_device_map(
+        model, no_split_module_classes=['LlamaDecoderLayer'], max_memory=mmap)
     model = model_cls.from_pretrained(
         path,
         torch_dtype='auto',
         low_cpu_mem_usage=True,
         attn_implementation='sdpa',
         device_map=device_map)
-    #max_memory=mmap)
 
     return model, model_str

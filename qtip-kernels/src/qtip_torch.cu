@@ -45,6 +45,8 @@ __host__ static void decompress_matvec(
     TORCH_CHECK(x.size(1) == n);
     TORCH_CHECK(codebook.size(0) == 1<<(S+V));
 
+    at::DeviceGuard guard(x.device());
+    
     decompress_matvec_ptr<L, S, R, V, M, N, K>(
             reinterpret_cast<float *>(out.data_ptr<float>()),
             reinterpret_cast<const uint32_t *>(compressed.data_ptr<int32_t>()),

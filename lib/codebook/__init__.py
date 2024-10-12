@@ -87,7 +87,7 @@ def {name}_cuda(
         compressed: torch.Tensor,
         x: torch.Tensor,
         codebook: torch.Tensor) -> torch.Tensor:
-    out = torch.zeros(({m}, 1), dtype=torch.float32, device="cuda")
+    out = torch.zeros(({m}, 1), dtype=torch.float32, device=x.device)
     {kernel_name}(out, compressed.reshape(-1).view(torch.int32), x.to(torch.float16).T, codebook.reshape(-1))
     return out.T
     """)
