@@ -36,8 +36,11 @@ The numbers below measure bs=1 inference speed on a RTX6000 Ada with matrix fusi
 This codebase contains 2, 3, and 4 bit matrix-vector multiplication kernels for the HYB code with L=16, Q=9, V=2, and $T_x = T_y = 16$.
 These kernels are located in `qtip_kernels` and have been integrated into the `BitshiftLinear` class in `lib/codebook/bitshift.py`.
 `eval/interactive_gen.py` contains a simple generation script that is compatible with those kernels and CUDA graphs (through `torch.compile`).
-This script *does not implement matrix fusion* so you will not get get the speeds in the table if you run it.
+
+This script *does not implement matrix fusion* so you will not get get the speeds in the table above if you run it.
 If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumbing to do so and should mostly translate over to this one.
+This script also *does not support CUDA graphs if the model spans multiple GPUs*, so expect very slow inference if your model spans multiple GPUs. 
+
 
 ### Compiling the kernels
 
