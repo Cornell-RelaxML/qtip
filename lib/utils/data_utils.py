@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from lib import codebook
 
 from .matmul_had import matmul_hadU
+from .misc import clean
 
 
 def flat_to_sym(V, N):
@@ -24,25 +25,27 @@ def sym_to_flat(A):
     return A[idxs.unbind()]
 
 
-def register_input_H_hook(module, device):
+def register_input_H_hook(module, save_pfx, device):
     n = module.in_features
     H = torch.zeros(n, n, dtype=torch.float64, device=device)
-    mu = torch.zeros(n, dtype=torch.float64, device=device)
     ct = 0
 
     def H_hook(module, x):
-        nonlocal H, mu, ct, n
+        nonlocal H, ct, n
         x = x[0].reshape(-1, n).to(torch.float64)
-        mu.add_(x.sum(dim=0))
         H.addmm_(x.T, x)
         ct += len(x)
 
     hook = module.register_forward_pre_hook(H_hook)
 
     def done():
-        nonlocal H, mu, ct, hook
+        nonlocal H, ct, hook
+        save_path = f"{save_pfx}_{device}.pt"
+        torch.save({'H': H, 'n': H.shape[0], 'ct': ct}, save_path)
+        del H, ct
         hook.remove()
-        return H.cpu(), mu.cpu(), ct
+        del hook
+        clean()
 
     return done
 
@@ -281,7 +284,7 @@ def unpack_quip(module, saved_layer):
     module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
     if module.tlut is not None:
         module.tlut.copy_(saved_layer['tlut'].float().to(torch.float16))
-    
+
 
 def dtype_from_str(str):
     dtype_map = {

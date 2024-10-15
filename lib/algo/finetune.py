@@ -3,66 +3,79 @@ Utilities for fine tuning
 """
 import copy
 import math
+from contextlib import contextmanager
 from operator import attrgetter
 
 import glog
 import torch
-from torch import nn, multiprocessing as mp
+from torch import multiprocessing as mp
+from torch import nn
 from transformers import AutoModelForCausalLM
 
 from lib import codebook, utils
 from lib.linear import QuantizedLinear
+
 from . import ldlq
+
+
+@contextmanager
+def use_tf32():
+    fp32_matmul_precision = torch.get_float32_matmul_precision()
+    torch.set_float32_matmul_precision('high')
+    yield
+    torch.set_float32_matmul_precision(fp32_matmul_precision)
 
 
 def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
                            args):
-    layer = layer.to(device)
-    optim = torch.optim.Adam(layer.parameters(), lr=args.ft_lr)
-    best_loss = utils.calculate_mse_loss(layer, valid_dl, device)
-    best_sd = copy.deepcopy(layer.state_dict())
-    glog.info(f'layer {name} initial loss {best_loss}')
-    scaler = torch.cuda.amp.GradScaler(enabled=True)
-    worse_ct = 0
+    with use_tf32():
+        layer = layer.to(device)
+        optim = torch.optim.Adam(layer.parameters(), lr=args.ft_lr)
+        best_loss = utils.calculate_mse_loss(layer, valid_dl, device)
+        best_sd = copy.deepcopy(layer.state_dict())
+        glog.info(f'layer {name} initial loss {best_loss}')
+        scaler = torch.cuda.amp.GradScaler(enabled=True)
+        worse_ct = 0
 
-    position_ids = None
+        position_ids = None
 
-    for epoch in range(args.ft_epochs):
-        for bidx, (source, targets) in enumerate(train_dl):
+        for epoch in range(args.ft_epochs):
+            for bidx, (source, targets) in enumerate(train_dl):
 
-            if position_ids is None:
-                position_ids = torch.arange(source.shape[1],
-                                            device=device).unsqueeze(0)
+                if position_ids is None:
+                    position_ids = torch.arange(source.shape[1],
+                                                device=device).unsqueeze(0)
 
-            targets = targets.to(device, non_blocking=True)
-            with torch.autocast(device_type='cuda',
-                                dtype=orig_dtype,
-                                enabled=True):
-                output = layer(source.to(device), position_ids=position_ids)[0]
-                loss = nn.MSELoss()(output, targets.to(device))
-            scaler.scale(loss).backward()
-            if bidx % args.ft_update_freq == args.ft_update_freq - 1 or bidx == len(
-                    train_dl) - 1:
-                scaler.step(optim)
-                scaler.update()
-                optim.zero_grad()
+                targets = targets.to(device, non_blocking=True)
+                with torch.autocast(device_type='cuda',
+                                    dtype=orig_dtype,
+                                    enabled=True):
+                    output = layer(source.to(device),
+                                   position_ids=position_ids)[0]
+                    loss = nn.MSELoss()(output, targets.to(device))
+                scaler.scale(loss).backward()
+                if bidx % args.ft_update_freq == args.ft_update_freq - 1 or bidx == len(
+                        train_dl) - 1:
+                    scaler.step(optim)
+                    scaler.update()
+                    optim.zero_grad()
 
-        if epoch % args.ft_valid_freq == (args.ft_valid_freq - 1):
-            test_loss = utils.calculate_mse_loss(layer, valid_dl, device)
-            if test_loss < best_loss:
-                glog.info(
-                    f'layer {name} @ epoch {epoch} new loss {test_loss} old loss {best_loss} BETTER'
-                )
-                best_loss = test_loss
-                best_sd = copy.deepcopy(layer.state_dict())
-                worse_ct = 0
-            else:
-                glog.info(
-                    f'layer {name} @ epoch {epoch} new loss {test_loss} old loss {best_loss} WORSE'
-                )
-                worse_ct += 1
-                if worse_ct >= args.ft_early_stop:
-                    break
+            if epoch % args.ft_valid_freq == (args.ft_valid_freq - 1):
+                test_loss = utils.calculate_mse_loss(layer, valid_dl, device)
+                if test_loss < best_loss:
+                    glog.info(
+                        f'layer {name} @ epoch {epoch} new loss {test_loss} old loss {best_loss} BETTER'
+                    )
+                    best_loss = test_loss
+                    best_sd = copy.deepcopy(layer.state_dict())
+                    worse_ct = 0
+                else:
+                    glog.info(
+                        f'layer {name} @ epoch {epoch} new loss {test_loss} old loss {best_loss} WORSE'
+                    )
+                    worse_ct += 1
+                    if worse_ct >= args.ft_early_stop:
+                        break
 
     del optim, train_dl, valid_dl
 
@@ -91,6 +104,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
 
     for quant_i, (linear_attr, name, in_hess_name,
                   out_hess_name) in enumerate(quant_order):
+        utils.clean()
         cb = cb.to(device).to(orig_dtype)
         orig_linear = attrgetter(linear_attr)(mixed_layer)
         W = orig_linear.weight.to(dtype_)
@@ -121,16 +135,18 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
 
         hatWr, Qidxs = ldlq.LDLQ(Wr, LRr, cb, args, for_kernel=has_kernel)
 
+        Qidxs = Qidxs.cpu()
         packed = cb.pack_trellis(
             Qidxs.reshape(m // args.td_x, args.td_x, n // args.td_y,
                           args.td_y // args.V).transpose(1, 2).reshape(
                               -1, args.td_x * args.td_y // args.V))
 
         if has_kernel:
-            packed = packed.view(torch.uint8).view(-1, 2).flip((-1,)).reshape(
-                m // 16 // 2, 2, n // 16 // 2, 2, 16 * 16 // 8, args.K).permute(
-                    0, 2, 4, 3, 1, 5).flip((-1,)).contiguous().flatten().view(
-                        torch.int16).reshape(packed.shape)
+            packed = packed.view(torch.uint8).view(-1, 2).flip(
+                (-1, )).reshape(m // 16 // 2, 2, n // 16 // 2, 2, 16 * 16 // 8,
+                                args.K).permute(0, 2, 4, 3, 1, 5).flip(
+                                    (-1, )).contiguous().flatten().view(
+                                        torch.int16).reshape(packed.shape)
 
         Wr *= Wscale
         hatWr *= Wscale
@@ -191,6 +207,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                                    train_dl, valid_dl, orig_dtype, args)
 
         cb = cb.cpu()
+        utils.clean()
 
     for quant_i, (linear_attr, name, in_hess_name,
                   out_hess_name) in enumerate(quant_order):

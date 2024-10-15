@@ -2,6 +2,7 @@ import fast_hadamard_transform
 import torch
 
 from lib import utils
+
 torch._dynamo.config.cache_size_limit = 256
 
 
@@ -112,6 +113,7 @@ def matmul_hadU_cuda(X, hadK, K, transpose=False):
     input = torch.ops.hadamard.hadamard(input.contiguous(), n**(-0.5))
     input = hadK.to(input.device).to(input.dtype) @ input
     return input.to(X.device).to(X.dtype).reshape(X.shape)
+
 
 def matmul_hadUt_cuda(X, hadK, K):
     return matmul_hadU_cuda(X, hadK, K, transpose=True)

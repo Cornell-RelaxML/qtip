@@ -12,9 +12,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.modeling_attn_mask_utils import \
     _prepare_4d_causal_attention_mask
 
-from lib.codebook import bitshift
 from lib import utils
 from lib.algo import finetune
+from lib.codebook import bitshift
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
@@ -137,17 +137,21 @@ def main(args):
     for i in range(len(model.model.layers)):
         glog.info(f'layer {i} gpu {cur_device}')
         if proc_list[cur_device] is not None:
-            proc_list[cur_device].join()
+            proc_list[cur_device][0].join()
+            model.model.layers[proc_list[cur_device][1]] = None
+            utils.clean()
             if cur_device == 0:
                 orig_emb_cache[0].copy_(orig_emb_cache[-1])
         if cur_device + 1 < nproc and proc_list[cur_device + 1] is not None:
-            proc_list[cur_device + 1].join()
+            proc_list[cur_device + 1][0].join()
         utils.clean()
         st = time.time()
         position_ids = position_ids.to(cur_device)
         attention_mask = attention_mask.to(cur_device)
+        print(position_ids.numel(), attention_mask.numel())
         model.model.layers[i].to(cur_device)
         for j in range(args.devset_size // args.batch_size):
+            utils.clean()
             orig_emb_cache[cur_device + 1][args.batch_size * j : args.batch_size * (j + 1)] = \
                 model.model.layers[i](
                     orig_emb_cache[cur_device][args.batch_size * j : args.batch_size * (j + 1)].to(cur_device),
@@ -168,23 +172,23 @@ def main(args):
             .format(i,
                     time.time() - st, orig_msv, target_msv))
 
-        proc_list[cur_device] = mp.Process(target=quantize_llama_decoder,
-                                           args=(
-                                               model.model.layers[i],
-                                               i,
-                                               cb,
-                                               args,
-                                               cur_device,
-                                               orig_emb_cache[cur_device],
-                                               orig_emb_cache[cur_device + 1],
-                                               all_config['model_config'],
-                                           ))
-        proc_list[cur_device].start()
+        proc_list[cur_device] = (mp.Process(target=quantize_llama_decoder,
+                                            args=(
+                                                model.model.layers[i],
+                                                i,
+                                                cb,
+                                                args,
+                                                cur_device,
+                                                orig_emb_cache[cur_device],
+                                                orig_emb_cache[cur_device + 1],
+                                                all_config['model_config'],
+                                            )), i)
+        proc_list[cur_device][0].start()
 
         cur_device = (cur_device + 1) % nproc
 
     for p in proc_list:
-        p.join()
+        p[0].join()
 
 
 if __name__ == '__main__':

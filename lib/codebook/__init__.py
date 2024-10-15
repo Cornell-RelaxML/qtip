@@ -1,7 +1,28 @@
-import torch
 import qtip_kernels
+import torch
 
 kernels = [
+    (53248, 1, 16384, 2),
+    (53248, 1, 16384, 3),
+    (53248, 1, 16384, 4),
+    (16384, 1, 53248, 2),
+    (16384, 1, 53248, 3),
+    (16384, 1, 53248, 4),
+    (1024, 1, 16384, 2),
+    (1024, 1, 16384, 3),
+    (1024, 1, 16384, 4),
+    (16384, 1, 16384, 2),
+    (16384, 1, 16384, 3),
+    (16384, 1, 16384, 4),
+    (4096, 1, 14336, 2),
+    (4096, 1, 14336, 3),
+    (4096, 1, 14336, 4),
+    (14336, 1, 4096, 2),
+    (14336, 1, 4096, 3),
+    (14336, 1, 4096, 4),
+    (1024, 1, 4096, 2),
+    (1024, 1, 4096, 3),
+    (1024, 1, 4096, 4),
     (4096, 1, 4096, 2),
     (4096, 1, 11008, 2),
     (11008, 1, 4096, 2),
@@ -62,8 +83,7 @@ def {name}_cuda(
         compressed: torch.Tensor,
         x: torch.Tensor,
         codebook: torch.Tensor) -> torch.Tensor:
-    out = torch.zeros(({m}, 1), dtype=torch.float32, device="cuda")
-    {kernel_name}(out, compressed.reshape(-1).view(torch.int32), x.T.to(torch.float16), codebook.reshape(-1))
+    out = torch.zeros(({m}, 1), dtype=torch.float32, device=x.device)
+    {kernel_name}(out, compressed.reshape(-1).view(torch.int32), x.to(torch.float16).T, codebook.reshape(-1))
     return out.T
     """)
-
