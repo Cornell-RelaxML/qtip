@@ -37,6 +37,10 @@ This codebase contains 2, 3, and 4 bit matrix-vector multiplication kernels for 
 These kernels are located in `qtip_kernels` and have been integrated into the `BitshiftLinear` class in `lib/codebook/bitshift.py`.
 `eval/interactive_gen.py` contains a simple generation script that is compatible with those kernels and CUDA graphs (through `torch.compile`).
 
+For example, if you want to generate up to 256 tokens of text from a 3 bit QTIP Llama 2 13B Chat model in "streaming mode" (slower than not streaming), run
+
+`python -m eval.interactive_gen --hf_path relaxml/Llama-2-13b-QTIP-3Bit --max_new_tokens 256 --enable_tf32 --streaming`
+
 This script **does not fuse matrices** so you will not get get the speeds in the table above if you run it.
 If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumbing to do so and should mostly translate over to this one.
 This script also **does not support CUDA graphs if the model spans multiple GPUs**, so expect very slow inference if your model spans multiple GPUs. 
