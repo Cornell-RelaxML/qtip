@@ -57,13 +57,12 @@ Prequantized QTIP models with the HYB code, L=16, and V=2 can be found [here](ht
 
 If you found this work useful, please consider citing
 ```
-@misc{tseng2024qtipquantizationtrellisesincoherence,
-      title={QTIP: Quantization with Trellises and Incoherence Processing}, 
+@inproceedings{
+      tseng2024qtip,
+      title={{QTIP}: Quantization with Trellises and Incoherence Processing},
       author={Albert Tseng and Qingyao Sun and David Hou and Christopher De Sa},
+      booktitle={The Thirty-eighth Annual Conference on Neural Information Processing Systems},
       year={2024},
-      eprint={2406.11235},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2406.11235}, 
+      url={https://openreview.net/forum?id=7sdkLVuYCU}
 }
 ```
