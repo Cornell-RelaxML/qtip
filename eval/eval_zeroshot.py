@@ -10,7 +10,6 @@ from lm_eval import evaluator, tasks
 from lm_eval.models.huggingface import HFLM
 from transformers import AutoTokenizer
 
-#from lib.utils import LMEvalAdaptor
 from lib.utils.unsafe_import import model_from_hf_path
 from lib.linear import QuantizedLinear
 
@@ -26,18 +25,18 @@ parser.add_argument('--num_fewshot', type=int, default=0)
 parser.add_argument('--limit', type=int, default=None)
 parser.add_argument('--apply_chat_template', action='store_true')
 parser.add_argument('--fewshot_as_multiturn', action='store_true')
-
+parser.add_argument('--manifest_model', action='store_true')
 
 def main(args):
     model, model_str = model_from_hf_path(args.hf_path)
 
     # manifest for faster inference
     # use for codebooks without kernel support
-    '''
-    for module in model.modules():
-        if isinstance(module, QuantizedLinear):
-            module.mode = 'train-fixW'
-    '''
+    if args.manifest_model:
+        for module in model.modules():
+            if isinstance(module, QuantizedLinear):
+                module.mode = 'train-fixW'
+
     tokenizer = AutoTokenizer.from_pretrained(model_str)
 
     glog.info('loaded model!')
@@ -59,7 +58,9 @@ def main(args):
         fewshot_as_multiturn=args.fewshot_as_multiturn
     )
 
+    print(results['results'])
     torch.save(results, args.output_path)
+
     
 
 if __name__ == '__main__':
