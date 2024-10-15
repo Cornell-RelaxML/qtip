@@ -9,9 +9,9 @@ import glog
 import torch
 from tqdm import tqdm
 
+from lib.linear import QuantizedLinear
 from lib.utils import gptq_data_utils
 from lib.utils.unsafe_import import model_from_hf_path
-from lib.linear import QuantizedLinear
 
 torch.set_grad_enabled(False)
 
@@ -26,14 +26,12 @@ def main(args):
     datasets = ['wikitext2', 'c4']
     model, model_str = model_from_hf_path(args.hf_path)
 
-   
     if args.manifest:
         # manifest the model in BF/FP16 for faster inference
         # useful for non-kernel supported decode modes
         for module in model.modules():
             if isinstance(module, QuantizedLinear):
                 module.mode = 'train-fixW'
-   
 
     for dataset in datasets:
         input_tok = gptq_data_utils.get_test_tokens(dataset,

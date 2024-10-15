@@ -10,6 +10,7 @@ from lib import codebook
 from .matmul_had import matmul_hadU
 from .misc import clean
 
+
 def flat_to_sym(V, N):
     A = torch.zeros(N, N, dtype=V.dtype, device=V.device)
     idxs = torch.tril_indices(N, N, device=V.device)
@@ -40,10 +41,7 @@ def register_input_H_hook(module, save_pfx, device):
     def done():
         nonlocal H, ct, hook
         save_path = f"{save_pfx}_{device}.pt"
-        torch.save({
-            'H': H,
-            'n': H.shape[0],
-            'ct': ct}, save_path)
+        torch.save({'H': H, 'n': H.shape[0], 'ct': ct}, save_path)
         del H, ct
         hook.remove()
         del hook
@@ -286,7 +284,7 @@ def unpack_quip(module, saved_layer):
     module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
     if module.tlut is not None:
         module.tlut.copy_(saved_layer['tlut'].float().to(torch.float16))
-    
+
 
 def dtype_from_str(str):
     dtype_map = {

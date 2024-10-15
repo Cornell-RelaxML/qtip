@@ -10,6 +10,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 import numpy
 import torch
+import torch.distributed as dist
 import torch.multiprocessing as mp
 from transformers import (AutoModelForCausalLM, AutoTokenizer,
                           PreTrainedTokenizerFast)
@@ -17,8 +18,6 @@ from transformers.modeling_attn_mask_utils import \
     _prepare_4d_causal_attention_mask
 
 from lib import utils
-
-import torch.distributed as dist
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', default=2, type=int)
@@ -32,14 +31,13 @@ parser.add_argument('--save_path', default='hessians/llama2_70b', type=str)
 parser.add_argument('--sample_proc', default=32, type=int)
 
 
-
 def main(args):
     print("loading model...")
     print("loaded model!")
     gpu_id = int(os.environ["LOCAL_RANK"])
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, use_fast=False)
     tokenizer.pad_token = tokenizer.eos_token
-        
+
     print("loading dataset...")
     devset = utils.sample_rp1t_concat(tokenizer,
                                       args.devset_size,
@@ -51,7 +49,8 @@ def main(args):
                                                      torch_dtype="auto",
                                                      low_cpu_mem_usage=True)
         print(f'processing split {lbi}')
-        dev_emb = model.model.embed_tokens(devset[lbi].view(-1, args.batch_size, args.ctx_size))
+        dev_emb = model.model.embed_tokens(devset[lbi].view(
+            -1, args.batch_size, args.ctx_size))
 
         print("loaded dataset!")
 
@@ -76,10 +75,14 @@ def main(args):
             layer = model.model.layers[0]
             layer = layer.cuda()
             save_pfx = f'/dev/shm/{transformer_layer_index}'
-            done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj, f'{save_pfx}_qkv', gpu_id)
-            done_o = utils.register_input_H_hook(layer.self_attn.o_proj, f'{save_pfx}_o', gpu_id)
-            done_up = utils.register_input_H_hook(layer.mlp.up_proj, f'{save_pfx}_up', gpu_id)
-            done_down = utils.register_input_H_hook(layer.mlp.down_proj, f'{save_pfx}_down', gpu_id)
+            done_qkv = utils.register_input_H_hook(layer.self_attn.q_proj,
+                                                   f'{save_pfx}_qkv', gpu_id)
+            done_o = utils.register_input_H_hook(layer.self_attn.o_proj,
+                                                 f'{save_pfx}_o', gpu_id)
+            done_up = utils.register_input_H_hook(layer.mlp.up_proj,
+                                                  f'{save_pfx}_up', gpu_id)
+            done_down = utils.register_input_H_hook(layer.mlp.down_proj,
+                                                    f'{save_pfx}_down', gpu_id)
             for di in range(len(dev_emb)):
                 tmp_input = dev_emb[di].cuda()
                 dev_emb[di] = layer(dev_emb[di].cuda(),
@@ -93,8 +96,12 @@ def main(args):
             layer = layer.cpu()
             del layer, model.model.layers[0]
             utils.clean()
-            fn_dict = {'qkv':done_qkv, 'o':done_o,
-                       'up': done_up, 'down': done_down}
+            fn_dict = {
+                'qkv': done_qkv,
+                'o': done_o,
+                'up': done_up,
+                'down': done_down
+            }
             for key in fn_dict:
                 fn_dict[key]()
                 utils.clean()
@@ -103,15 +110,18 @@ def main(args):
                 for key in fn_dict:
                     save_path = f"{args.save_path}/{transformer_layer_index}_{key}.pt"
                     if os.path.exists(save_path):
-                        data = torch.load(save_path, map_location=torch.device('cpu'))
-                        data['flatH'] = data['flatH'].to(torch.float64) * data['ct']
+                        data = torch.load(save_path,
+                                          map_location=torch.device('cpu'))
+                        data['flatH'] = data['flatH'].to(
+                            torch.float64) * data['ct']
                     else:
                         data = None
                     gi = 0
                     gi_path = f"/dev/shm/{transformer_layer_index}_{key}_{gi}.pt"
                     while os.path.exists(gi_path):
                         print(gi_path)
-                        d2 = torch.load(gi_path, map_location=torch.device('cpu'))
+                        d2 = torch.load(gi_path,
+                                        map_location=torch.device('cpu'))
                         if data is not None:
                             data['flatH'] += utils.sym_to_flat(d2['H'])
                             data['ct'] += d2['ct']
@@ -129,19 +139,19 @@ def main(args):
                     torch.save(data, save_path)
                     del data
                     utils.clean()
-                    
+
             dist.barrier()
-            
+
             print(f"done processing layer {transformer_layer_index}")
             transformer_layer_index += 1
-            
+
         del position_ids, attention_mask
-            
+
         del dev_emb
         utils.clean()
         del model
         utils.clean()
-        
+
 
 if __name__ == "__main__":
     #mp.set_start_method('spawn')

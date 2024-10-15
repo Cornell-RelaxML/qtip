@@ -1,5 +1,6 @@
 import torch
 
+
 @torch.compile
 def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
     if compressed.dtype != torch.uint16:
@@ -15,21 +16,20 @@ def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
 
     BITS_PER_BLOCK = R * 16 * 16  # R bits * f16 mma tile A size
 
-    compressed = (compressed.view(torch.uint8)
-                  .reshape(m // 16 // 2, k // 16 // 2, BLOCK_SIZE // 8, 2, 2, R)
-                  .permute(0, -2, 1, -3, 2, -1)
-                  .flip((-1,))
-                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16, 2)
-                  .flip((-1,))
-                  .view(torch.uint16)
-                  .reshape(m // 16, k // 16, BITS_PER_BLOCK // 16))
+    compressed = (compressed.view(torch.uint8).reshape(
+        m // 16 // 2, k // 16 // 2, BLOCK_SIZE // 8, 2, 2,
+        R).permute(0, -2, 1, -3, 2, -1).flip(
+            (-1, )).reshape(m // 16, k // 16, BITS_PER_BLOCK // 16, 2).flip(
+                (-1, )).view(torch.uint16).reshape(m // 16, k // 16,
+                                                   BITS_PER_BLOCK // 16))
     # decode block
 
     assert L <= 16
 
     blocked = compressed.reshape(R * m * k // BITS_PER_BLOCK,
                                  BITS_PER_BLOCK // 16, 1)
-    blocked_roll = torch.roll(blocked.to(torch.int32), -1, -2).to(blocked.dtype)
+    blocked_roll = torch.roll(blocked.to(torch.int32), -1,
+                              -2).to(blocked.dtype)
     blocked32 = torch.cat((blocked_roll, blocked),
                           dim=-1).reshape(blocked.shape[0],
                                           -1).contiguous().view(torch.uint32)
@@ -38,8 +38,9 @@ def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
     expanded32 = blocked32.reshape(*blocked32.shape,
                                    1).expand(*blocked32.shape,
                                              16).view(torch.int32)
-    shifts = (torch.arange(0, 16, dtype=torch.int32, device=blocked.device)).to(
-        torch.int32).reshape(1, 1, -1).expand(expanded32.shape)
+    shifts = (torch.arange(0, 16, dtype=torch.int32,
+                           device=blocked.device)).to(torch.int32).reshape(
+                               1, 1, -1).expand(expanded32.shape)
     shifted = expanded32 >> (16 - shifts)
     indices = torch.bitwise_and(
         shifted.reshape(shifted.shape[0], -1)[:, 16 - L::R << V], (1 << L) - 1)

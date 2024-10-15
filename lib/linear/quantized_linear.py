@@ -1,11 +1,12 @@
-import time
 import math
+import time
 
 import torch
 import torch.nn as nn
 
 from lib.codebook import bitshift
-from lib.utils import clean, dtype_from_str, get_hadK, matmul_hadU_cuda, has_kernel
+from lib.utils import (clean, dtype_from_str, get_hadK, has_kernel,
+                       matmul_hadU_cuda)
 
 
 class QuantizedLinear(nn.Module):
@@ -41,11 +42,14 @@ class QuantizedLinear(nn.Module):
         # packed into int16
         self.register_buffer(
             'trellis',
-            torch.zeros((out_features // td_x) * (in_features // td_y), math.ceil((td_x * td_y) * K / 16),
+            torch.zeros((out_features // td_x) * (in_features // td_y),
+                        math.ceil((td_x * td_y) * K / 16),
                         dtype=torch.int16))
 
         if decode_mode in ['lut', 'quantlut', 'quantlut_sym']:
-            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits, V, dtype=torch.float16),
+            self.tlut = nn.Parameter(torch.zeros(2**tlut_bits,
+                                                 V,
+                                                 dtype=torch.float16),
                                      requires_grad=False)
         else:
             self.tlut = None
@@ -85,16 +89,17 @@ class QuantizedLinear(nn.Module):
 
     def no_ckpt_forward(self, input):
         if not self.built_codebook_class:
-            self.codebook_class = bitshift.BitshiftLinear(self.td_x,
-                                                          self.td_y,
-                                                          self.L,
-                                                          self.K,
-                                                          self.V,
-                                                          self.tlut_bits,
-                                                          self.decode_mode,
-                                                          dtype=self.dtype,
-                                                          tlut=self.tlut,
-                                                          has_kernel=self.has_kernel)
+            self.codebook_class = bitshift.BitshiftLinear(
+                self.td_x,
+                self.td_y,
+                self.L,
+                self.K,
+                self.V,
+                self.tlut_bits,
+                self.decode_mode,
+                dtype=self.dtype,
+                tlut=self.tlut,
+                has_kernel=self.has_kernel)
 
             if self.mode == 'eval':
                 pass

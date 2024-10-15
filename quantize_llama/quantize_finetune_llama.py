@@ -12,9 +12,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.modeling_attn_mask_utils import \
     _prepare_4d_causal_attention_mask
 
-from lib.codebook import bitshift
 from lib import utils
 from lib.algo import finetune
+from lib.codebook import bitshift
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
@@ -173,16 +173,16 @@ def main(args):
                     time.time() - st, orig_msv, target_msv))
 
         proc_list[cur_device] = (mp.Process(target=quantize_llama_decoder,
-                                           args=(
-                                               model.model.layers[i],
-                                               i,
-                                               cb,
-                                               args,
-                                               cur_device,
-                                               orig_emb_cache[cur_device],
-                                               orig_emb_cache[cur_device + 1],
-                                               all_config['model_config'],
-                                           )), i)
+                                            args=(
+                                                model.model.layers[i],
+                                                i,
+                                                cb,
+                                                args,
+                                                cur_device,
+                                                orig_emb_cache[cur_device],
+                                                orig_emb_cache[cur_device + 1],
+                                                all_config['model_config'],
+                                            )), i)
         proc_list[cur_device][0].start()
 
         cur_device = (cur_device + 1) % nproc

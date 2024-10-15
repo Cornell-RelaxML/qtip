@@ -10,8 +10,8 @@ from lm_eval import evaluator, tasks
 from lm_eval.models.huggingface import HFLM
 from transformers import AutoTokenizer
 
-from lib.utils.unsafe_import import model_from_hf_path
 from lib.linear import QuantizedLinear
+from lib.utils.unsafe_import import model_from_hf_path
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
 
@@ -26,6 +26,7 @@ parser.add_argument('--limit', type=int, default=None)
 parser.add_argument('--apply_chat_template', action='store_true')
 parser.add_argument('--fewshot_as_multiturn', action='store_true')
 parser.add_argument('--manifest_model', action='store_true')
+
 
 def main(args):
     model, model_str = model_from_hf_path(args.hf_path)
@@ -44,24 +45,21 @@ def main(args):
 
     task_names = args.tasks.split(",")
 
-    lm_eval_model = HFLM(
-        model,
-        tokenizer=tokenizer,
-        batch_size=args.batch_size)
-    
+    lm_eval_model = HFLM(model,
+                         tokenizer=tokenizer,
+                         batch_size=args.batch_size)
+
     results = evaluator.simple_evaluate(
         model=lm_eval_model,
         tasks=task_names,
         limit=args.limit,
         num_fewshot=args.num_fewshot,
         apply_chat_template=args.apply_chat_template,
-        fewshot_as_multiturn=args.fewshot_as_multiturn
-    )
+        fewshot_as_multiturn=args.fewshot_as_multiturn)
 
     print(results['results'])
     torch.save(results, args.output_path)
 
-    
 
 if __name__ == '__main__':
     torch.set_grad_enabled(False)

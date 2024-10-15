@@ -13,17 +13,17 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
 import glog
 import torch
 import torch.multiprocessing as mp
+from accelerate import infer_auto_device_map, init_empty_weights
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
-from accelerate import infer_auto_device_map, init_empty_weights
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.modeling_attn_mask_utils import \
     _prepare_4d_causal_attention_mask
 
 from lib import codebook, utils
 from lib.algo import finetune
-from lib.utils.unsafe_import import model_from_hf_path
 from lib.linear import QuantizedLinear
+from lib.utils.unsafe_import import model_from_hf_path
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
