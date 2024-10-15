@@ -29,7 +29,7 @@ def model_from_hf_path(path, max_mem_ratio=0.9, device_map=None):
 
     if device_map is None:
         mmap = {
-            i: f"{torch.cuda.mem_get_info(i)[1]*{max_mem_ratio}/(1 << 30)}GiB"
+            i: f"{torch.cuda.mem_get_info(i)[1]*max_mem_ratio/(1 << 30)}GiB"
             for i in range(torch.cuda.device_count())
         }
         model = model_cls.from_pretrained(path,
