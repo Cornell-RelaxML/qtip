@@ -8,8 +8,7 @@ from transformers import AutoTokenizer, StaticCache
 
 from lib.utils.unsafe_import import model_from_hf_path
 torch.set_grad_enabled(False)
-#torch.set_float32_matmul_precision('high')
-#torch.backends.cuda.matmul.allow_tf32 = True
+
 
 def multinomial_sample_one_no_sync(probs_sort): # Does multinomial sampling without a cuda synchronization
     q = torch.empty_like(probs_sort).exponential_(1)
