@@ -57,8 +57,15 @@ def main(args):
         apply_chat_template=args.apply_chat_template,
         fewshot_as_multiturn=args.fewshot_as_multiturn)
 
-    print(results['results'])
-    torch.save(results, args.output_path)
+    for key in results['results']:
+        print(key)
+        print()
+        print(results['results'][key])
+        print()
+        print()
+
+    if args.output_path is not None:
+        torch.save(results, args.output_path)
 
 
 if __name__ == '__main__':

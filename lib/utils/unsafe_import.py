@@ -10,7 +10,7 @@ import transformers
 from model.llama import LlamaForCausalLM
 
 
-def model_from_hf_path(path, max_mem_ratio=0.9, device_map=None):
+def model_from_hf_path(path, max_mem_ratio=0.7, device_map=None):
 
     # AutoConfig fails to read name_or_path correctly
     bad_config = transformers.AutoConfig.from_pretrained(path)
