@@ -155,7 +155,9 @@ def main(hf_path, compile, interactive, max_tokens, top_k):
             print()
         else:
             print()
-        print(f"Decoding throughput: {decode_tps:.02f} tokens/sec. Includes tokens generated after the EOS token.\n\n")
+        print(
+            f"Decoding throughput: {decode_tps:.02f} tokens/sec. Includes tokens generated after the EOS token.\n\n"
+        )
 
 
 if __name__ == '__main__':
@@ -186,4 +188,5 @@ if __name__ == '__main__':
     if not args.disable_tf32:
         torch.set_float32_matmul_precision('high')
 
-    main(args.hf_path, not args.no_compile, args.streaming, args.max_new_tokens, args.top_k)
+    main(args.hf_path, not args.no_compile, args.streaming,
+         args.max_new_tokens, args.top_k)
