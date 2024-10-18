@@ -280,10 +280,28 @@ def sample_falcon_refinedweb(tokenizer, size=128, ctx_size=2048, nproc=1):
 
 def unpack_quip(module, saved_layer):
     module.trellis.copy_(saved_layer['trellis'])
-    module.SU.copy_(saved_layer['SU'])
-    module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
     if module.tlut is not None:
         module.tlut.copy_(saved_layer['tlut'].float().to(torch.float16))
+    if 'rcp' in saved_layer:
+        rcp = saved_layer['rcp']
+        SU = saved_layer['SU'].float()
+        SV = saved_layer['SV'].float()
+        Wscale = saved_layer['Wscale'].float()
+        module.rcp.copy_(rcp)
+        if rcp == 1:
+            # row
+            module.SU.copy_((SU.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SU.shape))
+            module.SV.copy_(SV)
+        elif rcp == 2:
+            module.SU.copy_(SU)
+            module.SV.copy_((SV.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SV.shape))
+        else:
+            module.SU.copy_(SU)
+            module.SV.copy_(SV*Wscale)
+    else:
+        module.SU.copy_(saved_layer['SU'])
+        module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
+
 
 
 def dtype_from_str(str):

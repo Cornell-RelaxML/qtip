@@ -387,16 +387,27 @@ class BitshiftLinear(nn.Module):
         return out
 
     def cache_hatW(self, packed_trellis, had_left, had_right, K_left, K_right,
-                   m, n):
+                   m, n, rcp):
         if self.has_kernel:
             hatW = self.get_hatW_kernel(packed_trellis, m, n)
         else:
             hatW = self.get_hatW(
                 self.cb.unpack_trellis(packed_trellis, self.td_x * self.td_y),
                 m, n)
-        self.hatW = matmul_hadU_cuda(
-            matmul_hadU_cuda(hatW.float() / self.scale, had_left, K_left).T,
-            had_right, K_right).T.contiguous().to(self.internal_dtype)
+        hatW = hatW.float() / self.scale
+
+        if rcp == 1:
+            self.hatW = matmul_hadU_cuda(
+                matmul_hadU_cuda(hatW.reshape(8*m, n//8), had_left, K_left).reshape(m, n).T,
+                had_right, K_right).T.contiguous().to(self.internal_dtype)
+        elif rcp == 2:
+            self.hatW = matmul_hadU_cuda(
+                matmul_hadU_cuda(hatW, had_left, K_left).T.reshape(8*n, m//8),
+                had_right, K_right).reshape(n, m).T.contiguous().to(self.internal_dtype)
+        else:
+            self.hatW = matmul_hadU_cuda(
+                matmul_hadU_cuda(hatW, had_left, K_left).T,
+                had_right, K_right).T.contiguous().to(self.internal_dtype)
 
     def forward(self,
                 input,
@@ -407,6 +418,7 @@ class BitshiftLinear(nn.Module):
                 had_right,
                 K_left,
                 K_right,
+                rcp,
                 mode='eval',
                 **kwargs):
         n, m = len(SU), len(SV)
@@ -417,7 +429,11 @@ class BitshiftLinear(nn.Module):
             x = (x.to(self.internal_dtype) @ self.hatW.T).float()
         else:
             bs = x.shape[0]
-            x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
+            if rcp == 1:
+                x = matmul_hadUt_cuda(x.reshape(bs*8, n//8), had_left, K_left).reshape(x.shape) / self.scale
+            else:
+                x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
+                
             if bs == 1 and self.has_kernel:
                 wrapper = getattr(
                     torch.ops.quip_lib,
@@ -438,7 +454,10 @@ class BitshiftLinear(nn.Module):
                     hatW = self.get_hatW(trellis, m, n, round=False)
                 x = (x.to(hatW.dtype) @ hatW.T).float()
 
-            x = matmul_hadU_cuda(x, had_right, K_right)
+            if rcp == 2:
+                x = matmul_hadU_cuda(x.reshape(bs*8, m // 8), had_right, K_right).reshape(x.shape)
+            else:
+                x = matmul_hadU_cuda(x, had_right, K_right)
 
         x = x.to(SV.device) * (SV * self.scale)
         return x.view(*input.shape[:-1], m).to(input.dtype)

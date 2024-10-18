@@ -12,20 +12,20 @@ from lib.utils import (clean, dtype_from_str, get_hadK, has_kernel,
 class QuantizedLinear(nn.Module):
 
     def __init__(
-        self,
-        in_features,
-        out_features,
-        td_x,
-        td_y,
-        L,  # trellis window
-        K,  # bpw
-        V,  # vq dim
-        tlut_bits,  # tunable LUT bits
-        decode_mode,
-        bias=False,
-        dtype=torch.float16,
-        mode='eval',
-        grad_ckpt=False,
+            self,
+            in_features,
+            out_features,
+            td_x,
+            td_y,
+            L,  # trellis window
+            K,  # bpw
+            V,  # vq dim
+            tlut_bits,  # tunable LUT bits
+            decode_mode,
+            bias=False,
+            dtype=torch.float16,
+            mode='eval',
+            grad_ckpt=False,
     ):
         super().__init__()
 
@@ -38,6 +38,7 @@ class QuantizedLinear(nn.Module):
         self.V = V
         self.tlut_bits = tlut_bits
         self.decode_mode = decode_mode
+        self.register_buffer('rcp', torch.tensor(0))
         self.dtype = dtype
         # packed into int16
         self.register_buffer(
@@ -114,7 +115,7 @@ class QuantizedLinear(nn.Module):
                 self.codebook_class.cache_hatW(self.trellis, self.had_left,
                                                self.had_right, self.K_left,
                                                self.K_right, len(self.SV),
-                                               len(self.SU))
+                                               len(self.SU), self.rcp)
                 self.trellis = self.trellis.cpu()
                 del self.had_left, self.had_right, self.K_left, self.K_right
                 clean()
@@ -135,6 +136,7 @@ class QuantizedLinear(nn.Module):
                                      self.had_right,
                                      self.K_left,
                                      self.K_right,
+                                     self.rcp,
                                      mode=self.mode) + 0
         if self.bias is not None:
             return result + self.bias

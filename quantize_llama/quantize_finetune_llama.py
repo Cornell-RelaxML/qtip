@@ -49,6 +49,7 @@ parser.add_argument('--V', default=2, type=int)
 parser.add_argument('--tlut_bits', default=0, type=int)
 parser.add_argument('--decode_mode', default='lut', type=str)
 parser.add_argument('--ft_train_lut', action='store_true')
+parser.add_argument('--split_for_tp', action='store_true')
 
 
 def check_exist(idx, args):
@@ -66,13 +67,13 @@ def quantize_llama_decoder(layer, idx, cb, args, device, pre_orig_emb,
         return
 
     # layer name, save_name, input hessian file, output hessian file
-    quant_order = [('self_attn.v_proj', 'v', 'qkv', 'v'),
-                   ('self_attn.q_proj', 'q', 'qkv', 'q'),
-                   ('self_attn.k_proj', 'k', 'qkv', 'k'),
-                   ('self_attn.o_proj', 'o', 'o', 'o'),
-                   ('mlp.up_proj', 'up', 'up', 'up'),
-                   ('mlp.gate_proj', 'gate', 'up', 'gate'),
-                   ('mlp.down_proj', 'down', 'down', 'down')]
+    quant_order = [('self_attn.v_proj', 'v', 'qkv', 'v', 'col'),
+                   ('self_attn.q_proj', 'q', 'qkv', 'q', 'col'),
+                   ('self_attn.k_proj', 'k', 'qkv', 'k', 'col'),
+                   ('self_attn.o_proj', 'o', 'o', 'o', 'row'),
+                   ('mlp.up_proj', 'up', 'up', 'up', 'col'),
+                   ('mlp.gate_proj', 'gate', 'up', 'gate', 'col'),
+                   ('mlp.down_proj', 'down', 'down', 'down', 'row')]
     finetune.quantize_finetune_decoder_layer(layer, quant_order, idx, cb, args,
                                              device, pre_orig_emb, orig_emb)
     torch.save(
@@ -106,6 +107,7 @@ def main(args):
         'decode_mode': args.decode_mode,
         'td_x': args.td_x,
         'td_y': args.td_y,
+        'split_for_tp': args.split_for_tp,
     }
     all_config['model_config'].update({'quip_params': quip_params})
     torch.save(all_config, os.path.join(args.save_path, 'config.pt'))
