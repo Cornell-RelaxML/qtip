@@ -104,6 +104,10 @@ class QuantizedLinear(nn.Module):
                 tlut=self.tlut,
                 has_kernel=self.has_kernel)
 
+            rcp = self.rcp.item()
+            del self.rcp
+            self.rcp = rcp
+            
             if self.mode == 'eval':
                 pass
             elif self.mode == 'train-recons':
@@ -117,7 +121,7 @@ class QuantizedLinear(nn.Module):
                 self.codebook_class.cache_hatW(self.trellis, self.had_left,
                                                self.had_right, self.K_left,
                                                self.K_right, len(self.SV),
-                                               len(self.SU), self.rcp)
+                                               len(self.SU), self.rcp, self.tp_rank)
                 self.trellis = self.trellis.cpu()
                 del self.had_left, self.had_right, self.K_left, self.K_right
                 clean()
@@ -127,7 +131,7 @@ class QuantizedLinear(nn.Module):
                 self.K_right = None
             else:
                 raise Exception
-
+            
             self.built_codebook_class = True
 
         result = self.codebook_class(input,

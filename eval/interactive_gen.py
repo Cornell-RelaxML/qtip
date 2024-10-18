@@ -85,11 +85,12 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     return generated_ids, text, max_new_tokens / decode_time
 
 
-def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
+def main(hf_path, compile, interactive, max_tokens, top_k):
     device = "cuda"
     model, model_str = model_from_hf_path(hf_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_str)
+
     tokenizer.pad_token = tokenizer.eos_token
     past_kv = StaticCache(model.config,
                           1,
@@ -144,10 +145,17 @@ def main(hf_path, compile, interactive, num_samples, max_tokens, top_k):
         ids, text, decode_tps = generate(model, tokenizer, text, max_tokens,
                                          top_k, callback, past_kv)
         if not interactive:
+            ids = ids[0]
+            cutoff = 0
+            while cutoff < len(ids) and ids[cutoff] != tokenizer.eos_token_id:
+                cutoff += 1
+            ids = ids[:cutoff]
+            text = tokenizer.decode(torch.tensor(ids))
             print(text)
+            print()
         else:
             print()
-        print(f"Decoding throughput: {decode_tps:.02f} tokens/sec")
+        print(f"Decoding throughput: {decode_tps:.02f} tokens/sec\n\n")
 
 
 if __name__ == '__main__':
@@ -158,10 +166,6 @@ if __name__ == '__main__':
     parser.add_argument('--streaming',
                         action='store_true',
                         help='Whether to launch in stream mode')
-    parser.add_argument('--num_samples',
-                        type=int,
-                        default=5,
-                        help='Number of samples.')
     parser.add_argument('--max_new_tokens',
                         type=int,
                         default=512,
@@ -173,14 +177,13 @@ if __name__ == '__main__':
     parser.add_argument('--no_compile',
                         action='store_true',
                         help='Whether to compile the model.')
-    parser.add_argument('--enable_tf32',
+    parser.add_argument('--disable_tf32',
                         action='store_true',
-                        help='Whether to enable TF32 for FP32 matmuls.')
+                        help='Whether to disable TF32 for FP32 matmuls.')
 
     args = parser.parse_args()
 
-    if args.enable_tf32:
+    if not args.disable_tf32:
         torch.set_float32_matmul_precision('high')
 
-    main(args.hf_path, not args.no_compile, args.streaming, args.num_samples,
-         args.max_new_tokens, args.top_k)
+    main(args.hf_path, not args.no_compile, args.streaming, args.max_new_tokens, args.top_k)

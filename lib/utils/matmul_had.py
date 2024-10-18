@@ -102,7 +102,7 @@ def hadamard(x: torch.Tensor, scale: float) -> torch.Tensor:
     return fast_hadamard_transform.hadamard_transform(x, scale)
 
 
-def matmul_hadU_cuda(X, hadK, K, transpose=False):
+def matmul_hadU_cuda(X, hadK, K, transpose=False, tp_rank=1):
     n = X.shape[-1]
     if K == 1:
         return torch.ops.hadamard.hadamard(X.contiguous(), n**(-0.5))
