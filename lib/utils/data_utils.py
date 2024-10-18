@@ -291,18 +291,20 @@ def unpack_quip(module, saved_layer):
         module.tp_rank.copy_(saved_layer['tp_rank'])
         if rcp == 1:
             # row
-            module.SU.copy_((SU.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SU.shape))
+            module.SU.copy_(
+                (SU.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SU.shape))
             module.SV.copy_(SV)
         elif rcp == 2:
             module.SU.copy_(SU)
-            module.SV.copy_((SV.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SV.shape))
+            module.SV.copy_(
+                (SV.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SV.shape))
         else:
             module.SU.copy_(SU)
-            module.SV.copy_(SV*Wscale)
+            module.SV.copy_(SV * Wscale)
     else:
         module.SU.copy_(saved_layer['SU'])
-        module.SV.copy_(saved_layer['SV'].float() * saved_layer['Wscale'].float())
-
+        module.SV.copy_(saved_layer['SV'].float() *
+                        saved_layer['Wscale'].float())
 
 
 def dtype_from_str(str):

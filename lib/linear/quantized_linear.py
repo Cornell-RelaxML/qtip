@@ -12,20 +12,20 @@ from lib.utils import (clean, dtype_from_str, get_hadK, has_kernel,
 class QuantizedLinear(nn.Module):
 
     def __init__(
-            self,
-            in_features,
-            out_features,
-            td_x,
-            td_y,
-            L,  # trellis window
-            K,  # bpw
-            V,  # vq dim
-            tlut_bits,  # tunable LUT bits
-            decode_mode,
-            bias=False,
-            dtype=torch.float16,
-            mode='eval',
-            grad_ckpt=False,
+        self,
+        in_features,
+        out_features,
+        td_x,
+        td_y,
+        L,  # trellis window
+        K,  # bpw
+        V,  # vq dim
+        tlut_bits,  # tunable LUT bits
+        decode_mode,
+        bias=False,
+        dtype=torch.float16,
+        mode='eval',
+        grad_ckpt=False,
     ):
         super().__init__()
 
