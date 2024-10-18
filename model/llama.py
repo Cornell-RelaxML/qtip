@@ -26,7 +26,7 @@ import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.activations import ACT2FN
-from transformers.cache_utils import Cache, DynamicCache, StaticCache
+from .cache_utils import Cache, DynamicCache, StaticCache
 from transformers.generation import GenerationMixin
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.modeling_flash_attention_utils import \
@@ -827,8 +827,8 @@ class LlamaSdpaAttention(LlamaAttention):
 
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,
-            key_states,
-            value_states,
+            key_states.to(query_states.device),
+            value_states.to(query_states.device),
             attn_mask=causal_mask,
             dropout_p=self.attention_dropout if self.training else 0.0,
             is_causal=is_causal,
