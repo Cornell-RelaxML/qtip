@@ -4,7 +4,8 @@ import time
 from typing import Optional
 
 import torch
-from transformers import AutoTokenizer, StaticCache
+from transformers import AutoTokenizer
+from model.cache_utils import StaticCache
 
 from lib.utils.unsafe_import import model_from_hf_path
 
