@@ -38,6 +38,9 @@ class QuantizedLinear(nn.Module):
         self.V = V
         self.tlut_bits = tlut_bits
         self.decode_mode = decode_mode
+        self.register_buffer('rcp', torch.tensor(0))
+        # TP rank, not used unless rcp != 0
+        self.register_buffer('tp_rank', torch.tensor(8))
         self.dtype = dtype
         # packed into int16
         self.register_buffer(
@@ -114,7 +117,7 @@ class QuantizedLinear(nn.Module):
                 self.codebook_class.cache_hatW(self.trellis, self.had_left,
                                                self.had_right, self.K_left,
                                                self.K_right, len(self.SV),
-                                               len(self.SU))
+                                               len(self.SU), self.rcp)
                 self.trellis = self.trellis.cpu()
                 del self.had_left, self.had_right, self.K_left, self.K_right
                 clean()
@@ -135,6 +138,8 @@ class QuantizedLinear(nn.Module):
                                      self.had_right,
                                      self.K_left,
                                      self.K_right,
+                                     self.rcp,
+                                     self.tp_rank,
                                      mode=self.mode) + 0
         if self.bias is not None:
             return result + self.bias
