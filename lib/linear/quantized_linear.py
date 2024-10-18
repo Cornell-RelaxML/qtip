@@ -39,6 +39,8 @@ class QuantizedLinear(nn.Module):
         self.tlut_bits = tlut_bits
         self.decode_mode = decode_mode
         self.register_buffer('rcp', torch.tensor(0))
+        # TP rank, not used unless rcp != 0
+        self.register_buffer('tp_rank', torch.tensor(8))
         self.dtype = dtype
         # packed into int16
         self.register_buffer(
@@ -137,6 +139,7 @@ class QuantizedLinear(nn.Module):
                                      self.K_left,
                                      self.K_right,
                                      self.rcp,
+                                     self.tp_rank,
                                      mode=self.mode) + 0
         if self.bias is not None:
             return result + self.bias

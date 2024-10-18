@@ -288,6 +288,7 @@ def unpack_quip(module, saved_layer):
         SV = saved_layer['SV'].float()
         Wscale = saved_layer['Wscale'].float()
         module.rcp.copy_(rcp)
+        module.tp_rank.copy_(saved_layer['tp_rank'])
         if rcp == 1:
             # row
             module.SU.copy_((SU.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(SU.shape))

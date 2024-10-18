@@ -126,24 +126,24 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         if args.split_for_tp:
             if rcp == 'col':
                 # split along output dimension
-                Wr = utils.matmul_hadUt(utils.matmul_hadUt((W.T.to(device) * SV).reshape(n*8, m // 8)).reshape(W.T.shape).T * SU)
+                Wr = utils.matmul_hadUt(utils.matmul_hadUt((W.T.to(device) * SV).reshape(n*args.tp_rank, m // args.tp_rank)).reshape(W.T.shape).T * SU)
                 HRr = utils.matmul_hadUt(utils.matmul_hadUt(HR.to(device) * SU).T * SU)
-                Wscale = Wr.reshape(8, m*n//8).square().mean(dim=-1).sqrt() / (
+                Wscale = Wr.reshape(args.tp_rank, m*n//args.tp_rank).square().mean(dim=-1).sqrt() / (
                     cb.lut.to(torch.float64).square().mean().sqrt().float() *
                     args.scale_override)
-                Wr = Wr.reshape(8, m*n//8) / Wscale.unsqueeze(-1)
+                Wr = Wr.reshape(args.tp_rank, m*n//args.tp_rank) / Wscale.unsqueeze(-1)
                 Wr = Wr.reshape(m, n)
 
             elif rcp == 'row':
                 # split along input dimension
-                Wr = utils.matmul_hadUt((utils.matmul_hadUt(W.T.to(device) * SV).T * SU).reshape(m*8, n // 8)).reshape(W.shape)
+                Wr = utils.matmul_hadUt((utils.matmul_hadUt(W.T.to(device) * SV).T * SU).reshape(m*args.tp_rank, n // args.tp_rank)).reshape(W.shape)
                 HRr = utils.matmul_hadUt(
-                    (utils.matmul_hadUt((HR.to(device) * SU).reshape(n * 8, n // 8)).reshape(n, n).T * SU).reshape(n*8, n//8)).reshape(n,n)
-                Wscale = Wr.reshape(m, 8, n//8).transpose(0, 1).reshape(8, m*n//8).square().mean(dim=-1).sqrt() / (
+                    (utils.matmul_hadUt((HR.to(device) * SU).reshape(n * args.tp_rank, n // args.tp_rank)).reshape(n, n).T * SU).reshape(n*args.tp_rank, n//args.tp_rank)).reshape(n,n)
+                Wscale = Wr.reshape(m, args.tp_rank, n//args.tp_rank).transpose(0, 1).reshape(args.tp_rank, m*n//args.tp_rank).square().mean(dim=-1).sqrt() / (
                     cb.lut.to(torch.float64).square().mean().sqrt().float() *
                     args.scale_override)
-                Wr = Wr.reshape(m, 8, n//8).transpose(0, 1).reshape(8, m*n//8) / Wscale.unsqueeze(-1)
-                Wr = Wr.reshape(8, m, n//8).transpose(0, 1).reshape(m, n)
+                Wr = Wr.reshape(m, args.tp_rank, n//args.tp_rank).transpose(0, 1).reshape(args.tp_rank, m*n//args.tp_rank) / Wscale.unsqueeze(-1)
+                Wr = Wr.reshape(args.tp_rank, m, n//args.tp_rank).transpose(0, 1).reshape(m, n)
 
         else:
             Wr = utils.matmul_hadUt(utils.matmul_hadUt(W.T.to(device) * SV).T * SU)
@@ -173,13 +173,13 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                                         torch.int16).reshape(packed.shape)
 
         if rcp == 'col':
-            Wr = (Wr.reshape(8, m*n//8) * Wscale.unsqueeze(-1)).reshape(m, n)
-            hatWr = (hatWr.reshape(8, m*n//8) * Wscale.unsqueeze(-1)).reshape(m, n)
+            Wr = (Wr.reshape(args.tp_rank, m*n//args.tp_rank) * Wscale.unsqueeze(-1)).reshape(m, n)
+            hatWr = (hatWr.reshape(args.tp_rank, m*n//args.tp_rank) * Wscale.unsqueeze(-1)).reshape(m, n)
         elif rcp == 'row':
-            Wr = Wr.reshape(m, 8, n//8).transpose(0, 1).reshape(8, -1) * Wscale.unsqueeze(-1)
-            Wr = Wr.reshape(8, m, n//8).transpose(0, 1).reshape(m, n)
-            hatWr = hatWr.reshape(m, 8, n//8).transpose(0, 1).reshape(8, -1) * Wscale.unsqueeze(-1)
-            hatWr = hatWr.reshape(8, m, n//8).transpose(0, 1).reshape(m, n)
+            Wr = Wr.reshape(m, args.tp_rank, n//args.tp_rank).transpose(0, 1).reshape(args.tp_rank, -1) * Wscale.unsqueeze(-1)
+            Wr = Wr.reshape(args.tp_rank, m, n//args.tp_rank).transpose(0, 1).reshape(m, n)
+            hatWr = hatWr.reshape(m, args.tp_rank, n//args.tp_rank).transpose(0, 1).reshape(args.tp_rank, -1) * Wscale.unsqueeze(-1)
+            hatWr = hatWr.reshape(args.tp_rank, m, n//args.tp_rank).transpose(0, 1).reshape(m, n)
         else:
             Wr *= Wscale
             hatWr *= Wscale
@@ -211,7 +211,8 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                 'tlut':
                 cb.tlut.data.to(orig_dtype).cpu()
                 if hasattr(cb, 'tlut') else None,
-                'rcp': rcp_int
+                'rcp': rcp_int,
+                'tp_rank': args.tp_rank
             }, save_path)
 
         q_linear = QuantizedLinear(
@@ -231,14 +232,15 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         q_linear.SU.copy_(SU)
         q_linear.SV.copy_(SV)
         q_linear.rcp.copy_(rcp_int)
+        q_linear.tp_rank.copy_(args.tp_rank)
         q_linear = q_linear.to(device).float()
 
         if rcp == 'row':
-            q_linear.SU = nn.Parameter((q_linear.SU.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(q_linear.SU.shape), requires_grad=True)
+            q_linear.SU = nn.Parameter((q_linear.SU.reshape(args.tp_rank, -1) * Wscale.unsqueeze(-1)).reshape(q_linear.SU.shape), requires_grad=True)
             q_linear.SV = nn.Parameter(q_linear.SV, requires_grad=True)
         elif rcp == 'col':
             q_linear.SU = nn.Parameter(q_linear.SU, requires_grad=True)
-            q_linear.SV = nn.Parameter((q_linear.SV.reshape(8, -1) * Wscale.unsqueeze(-1)).reshape(q_linear.SV.shape), requires_grad=True)
+            q_linear.SV = nn.Parameter((q_linear.SV.reshape(args.tp_rank, -1) * Wscale.unsqueeze(-1)).reshape(q_linear.SV.shape), requires_grad=True)
         else:
             q_linear.SU = nn.Parameter(q_linear.SU, requires_grad=True)
             q_linear.SV = nn.Parameter(q_linear.SV * Wscale, requires_grad=True)
@@ -266,14 +268,14 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         data = torch.load(save_path)
         if rcp == 'row':
             data['SU'] = (
-                ((quant_linear.SU.data).reshape(8, -1) /
+                ((quant_linear.SU.data).reshape(args.tp_rank, -1) /
                 data['Wscale'].to(quant_linear.SU.device).unsqueeze(-1)).reshape(
                     quant_linear.SU.data.shape)).to(orig_dtype).cpu()
             data['SV'] = quant_linear.SV.data.to(orig_dtype).cpu()
         elif rcp == 'col':
             data['SU'] = quant_linear.SU.data.to(orig_dtype).cpu()
             data['SV'] = (
-                ((quant_linear.SV.data).reshape(8, -1) /
+                ((quant_linear.SV.data).reshape(args.tp_rank, -1) /
                 data['Wscale'].to(quant_linear.SV.device).unsqueeze(-1)).reshape(
                     quant_linear.SV.data.shape)).to(orig_dtype).cpu()
         else:

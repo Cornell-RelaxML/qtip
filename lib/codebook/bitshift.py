@@ -387,7 +387,7 @@ class BitshiftLinear(nn.Module):
         return out
 
     def cache_hatW(self, packed_trellis, had_left, had_right, K_left, K_right,
-                   m, n, rcp):
+                   m, n, rcp, tp_rank):
         if self.has_kernel:
             hatW = self.get_hatW_kernel(packed_trellis, m, n)
         else:
@@ -398,11 +398,11 @@ class BitshiftLinear(nn.Module):
 
         if rcp == 1:
             self.hatW = matmul_hadU_cuda(
-                matmul_hadU_cuda(hatW.reshape(8*m, n//8), had_left, K_left).reshape(m, n).T,
+                matmul_hadU_cuda(hatW.reshape(tp_rank*m, n//tp_rank), had_left, K_left).reshape(m, n).T,
                 had_right, K_right).T.contiguous().to(self.internal_dtype)
         elif rcp == 2:
             self.hatW = matmul_hadU_cuda(
-                matmul_hadU_cuda(hatW, had_left, K_left).T.reshape(8*n, m//8),
+                matmul_hadU_cuda(hatW, had_left, K_left).T.reshape(tp_rank*n, m//tp_rank),
                 had_right, K_right).reshape(n, m).T.contiguous().to(self.internal_dtype)
         else:
             self.hatW = matmul_hadU_cuda(
@@ -419,6 +419,7 @@ class BitshiftLinear(nn.Module):
                 K_left,
                 K_right,
                 rcp,
+                tp_rank,
                 mode='eval',
                 **kwargs):
         n, m = len(SU), len(SV)
@@ -430,7 +431,7 @@ class BitshiftLinear(nn.Module):
         else:
             bs = x.shape[0]
             if rcp == 1:
-                x = matmul_hadUt_cuda(x.reshape(bs*8, n//8), had_left, K_left).reshape(x.shape) / self.scale
+                x = matmul_hadUt_cuda(x.reshape(bs*tp_rank, n//tp_rank), had_left, K_left).reshape(x.shape) / self.scale
             else:
                 x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
                 
@@ -455,7 +456,7 @@ class BitshiftLinear(nn.Module):
                 x = (x.to(hatW.dtype) @ hatW.T).float()
 
             if rcp == 2:
-                x = matmul_hadU_cuda(x.reshape(bs*8, m // 8), had_right, K_right).reshape(x.shape)
+                x = matmul_hadU_cuda(x.reshape(bs*tp_rank, m // tp_rank), had_right, K_right).reshape(x.shape)
             else:
                 x = matmul_hadU_cuda(x, had_right, K_right)
 

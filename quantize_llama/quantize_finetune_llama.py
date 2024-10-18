@@ -50,6 +50,7 @@ parser.add_argument('--tlut_bits', default=0, type=int)
 parser.add_argument('--decode_mode', default='lut', type=str)
 parser.add_argument('--ft_train_lut', action='store_true')
 parser.add_argument('--split_for_tp', action='store_true')
+parser.add_argument('--tp_rank', default=8, type=int)
 
 
 def check_exist(idx, args):
