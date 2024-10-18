@@ -155,7 +155,7 @@ def main(hf_path, compile, interactive, max_tokens, top_k):
             print()
         else:
             print()
-        print(f"Decoding throughput: {decode_tps:.02f} tokens/sec\n\n")
+        print(f"Decoding throughput: {decode_tps:.02f} tokens/sec. Includes tokens generated after the EOS token.\n\n")
 
 
 if __name__ == '__main__':
