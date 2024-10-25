@@ -46,7 +46,7 @@ If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumb
 This script also does not support CUDA graphs if the model spans multiple GPUs, so expect very slow inference if your model spans multiple GPUs. 
 Huggingface/Pytorch may add `torch.compile` support with `accelerate`-partitioned models (what the script uses) in the future, so this may change. 
 If you want fast multi-GPU inference today, you will need to integrate `lib/linear/quantized_linear.py` into your own model framework.
-Feel free to contribute to this codebase if you know an easy way to get CUDA graphs working with multiple GPUs.
+Feel free to contribute to this codebase if you know an easy way to get CUDA graphs working with multiple GPUs (i.e. not hardcoded for Llama).
 
 ### Compiling the kernels
 
