@@ -41,10 +41,12 @@ For example, if you want to generate up to 256 tokens of text from a 3 bit QTIP 
 
 `python -m eval.interactive_gen --hf_path relaxml/Llama-2-13b-QTIP-3Bit --max_new_tokens 256 --enable_tf32 --streaming`
 
-This script **does not fuse matrices** so you will not get get the speeds in the table above if you run it.
+**Note:** This script does not fuse matrices (q/k/v and up/gate) so you will not get get the speeds in the table above if you run it.
 If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumbing to do so and should mostly translate over to this one.
-This script also **does not support CUDA graphs if the model spans multiple GPUs**, so expect very slow inference if your model spans multiple GPUs. 
-
+This script also does not support CUDA graphs if the model spans multiple GPUs, so expect very slow inference if your model spans multiple GPUs. 
+Huggingface/Pytorch may add `torch.compile` support with `accelerate`-partitioned models (what the script uses) in the future, so this may change. 
+If you want fast multi-GPU inference today, you will need to integrate `lib/linear/quantized_linear.py` into your own model framework.
+Feel free to contribute to this codebase if you know an easy way to get CUDA graphs working with multiple GPUs.
 
 ### Compiling the kernels
 
