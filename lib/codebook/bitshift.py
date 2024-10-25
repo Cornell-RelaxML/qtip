@@ -380,7 +380,7 @@ class BitshiftLinear(nn.Module):
             1, 2).reshape(m // self.td_x, n // self.td_y, self.td_x,
                           self.td_y).transpose(1, 2).reshape(m, n)
 
-    def get_hatW_kernel(self, trellis, m, n, round=True):
+    def get_hatW_kernel(self, trellis, m, n):
         out = decode_compressed(self.cb.L, self.cb.tlut_bits, self.cb.K,
                                 int(math.log2(self.V)), m, n, trellis.view(-1),
                                 self.cb.lut.T)
@@ -457,7 +457,7 @@ class BitshiftLinear(nn.Module):
                     if mode == 'eval':
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
-                    hatW = self.get_hatW(trellis, m, n, round=False)
+                    hatW = self.get_hatW(trellis, m, n)
                 x = (x.to(hatW.dtype) @ hatW.T).float()
 
             if rcp == 2:

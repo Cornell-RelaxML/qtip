@@ -20,11 +20,12 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--hf_path', default='hfized/quantized_hada_70b', type=str)
 parser.add_argument('--seqlen', default=4096, type=int)
 parser.add_argument('--manifest', action='store_true')
+parser.add_argument('--max_mem_ratio', default=0.7, type=float)
 
 
 def main(args):
     datasets = ['wikitext2', 'c4']
-    model, model_str = model_from_hf_path(args.hf_path)
+    model, model_str = model_from_hf_path(args.hf_path, max_mem_ratio=args.max_mem_ratio)
 
     if args.manifest:
         # manifest the model in BF/FP16 for faster inference

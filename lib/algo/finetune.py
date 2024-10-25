@@ -30,11 +30,14 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
                            args):
     with use_tf32():
         layer = layer.to(device)
+
+        best_sd = {k: v.cpu() for k, v in layer.state_dict().items()}
+        utils.clean()
+
         optim = torch.optim.Adam(layer.parameters(), lr=args.ft_lr)
         best_loss = utils.calculate_mse_loss(layer, valid_dl, device)
-        best_sd = copy.deepcopy(layer.state_dict())
         glog.info(f'layer {name} initial loss {best_loss}')
-        scaler = torch.cuda.amp.GradScaler(enabled=True)
+        scaler = torch.cuda.amp.GradScaler(enabled=(orig_dtype==torch.float16))
         worse_ct = 0
 
         position_ids = None
@@ -52,7 +55,7 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
                                     enabled=True):
                     output = layer(source.to(device),
                                    position_ids=position_ids)[0]
-                    loss = nn.MSELoss()(output, targets.to(device))
+                    loss = nn.MSELoss()(output, targets)
                 scaler.scale(loss).backward()
                 if bidx % args.ft_update_freq == args.ft_update_freq - 1 or bidx == len(
                         train_dl) - 1:
@@ -67,7 +70,8 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
                         f'layer {name} @ epoch {epoch} new loss {test_loss} old loss {best_loss} BETTER'
                     )
                     best_loss = test_loss
-                    best_sd = copy.deepcopy(layer.state_dict())
+                    best_sd = {k: v.cpu() for k, v in layer.state_dict().items()}
+                    utils.clean()
                     worse_ct = 0
                 else:
                     glog.info(
@@ -79,9 +83,9 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
 
     del optim, train_dl, valid_dl
 
+    layer = layer.cpu()
     layer.load_state_dict(best_sd)
     utils.clean()
-    layer = layer.cpu()
 
 
 def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
@@ -108,6 +112,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         cb = cb.to(device).to(orig_dtype)
         orig_linear = attrgetter(linear_attr)(mixed_layer)
         W = orig_linear.weight.to(dtype_)
+        del orig_linear
         (m, n) = W.shape
         SU = (torch.randn(n, device=device).sign() + 1e-5).sign().to(dtype_)
         SV = (torch.randn(m, device=device).sign() + 1e-5).sign().to(dtype_)
@@ -132,6 +137,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                             W.T.shape).T * SU)
                 HRr = utils.matmul_hadUt(
                     utils.matmul_hadUt(HR.to(device) * SU).T * SU)
+
                 Wscale = Wr.reshape(
                     args.tp_rank, m * n // args.tp_rank).square().mean(
                         dim=-1).sqrt() / (cb.lut.to(
@@ -170,6 +176,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                 utils.matmul_hadUt(W.T.to(device) * SV).T * SU)
             HRr = utils.matmul_hadUt(
                 utils.matmul_hadUt(HR.to(device) * SU).T * SU)
+            
             Wscale = Wr.square().mean().sqrt() / (
                 cb.lut.to(torch.float64).square().mean().sqrt().float() *
                 args.scale_override)
@@ -193,6 +200,8 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                                 args.K).permute(0, 2, 4, 3, 1, 5).flip(
                                     (-1, )).contiguous().flatten().view(
                                         torch.int16).reshape(packed.shape)
+        else:
+            packed = packed.view(torch.int16)
 
         if rcp == 'col':
             Wr = (Wr.reshape(args.tp_rank, m * n // args.tp_rank) *
@@ -219,7 +228,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         print(
             f'{idx}_{name} proxy err {err.item()} tr(WHW.T) {torch.trace(Wr @ HRr @ Wr.T)}'
         )
-
+        
         save_path = f'{args.save_path}/{idx}_{name}.pt'
 
         # 0 = no tensor parallelism, 1 = row parallel, 2 = column parallel
@@ -248,6 +257,10 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
                 args.tp_rank
             }, save_path)
 
+
+        del HRr, Wr, hatWr, LRr, Qidxs
+        utils.clean()
+        
         q_linear = QuantizedLinear(
             n,
             m,
@@ -260,7 +273,7 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
             args.decode_mode,
             mode='train-recons' if args.ft_train_lut else 'train-fixW',
             dtype=orig_dtype,
-            grad_ckpt=False)
+            grad_ckpt=args.ft_grad_ckpt)
         q_linear.trellis.copy_(packed)
         q_linear.SU.copy_(SU)
         q_linear.SV.copy_(SV)
@@ -268,6 +281,9 @@ def quantize_finetune_decoder_layer(mixed_layer, quant_order, idx, cb, args,
         q_linear.tp_rank.copy_(args.tp_rank)
         q_linear = q_linear.to(device).float()
 
+        del packed, SU, SV
+        utils.clean()
+        
         if rcp == 'row':
             q_linear.SU = nn.Parameter(
                 (q_linear.SU.reshape(args.tp_rank, -1) *

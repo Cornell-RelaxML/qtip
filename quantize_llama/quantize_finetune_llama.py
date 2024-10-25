@@ -123,6 +123,7 @@ def main(args):
 
     nproc = torch.cuda.device_count()
     orig_emb_cache = [model.model.embed_tokens(devset)]
+
     for _ in range(nproc):
         orig_emb_cache.append(
             torch.zeros(orig_emb_cache[0].shape,
@@ -151,7 +152,6 @@ def main(args):
         st = time.time()
         position_ids = position_ids.to(cur_device)
         attention_mask = attention_mask.to(cur_device)
-        print(position_ids.numel(), attention_mask.numel())
         model.model.layers[i].to(cur_device)
         for j in range(args.devset_size // args.batch_size):
             utils.clean()
@@ -163,17 +163,10 @@ def main(args):
                     use_cache=False,
                     output_attentions=False)[0].cpu()
         model.model.layers[i].cpu()
-        orig_msv = orig_emb_cache[cur_device].float().norm(
-        )**2 / orig_emb_cache[cur_device].numel()
-        target_msv = orig_emb_cache[cur_device + 1].float().norm(
-        )**2 / orig_emb_cache[cur_device + 1].numel()
         position_ids = position_ids.cpu()
         attention_mask = attention_mask.cpu()
         utils.clean()
-        glog.info(
-            'computed original embedding for layer {} in {}s, pre msv {}, post msv {}'
-            .format(i,
-                    time.time() - st, orig_msv, target_msv))
+        glog.info('computed original embedding for layer {} in {}s'.format(i, time.time() - st))
 
         proc_list[cur_device] = (mp.Process(target=quantize_llama_decoder,
                                             args=(

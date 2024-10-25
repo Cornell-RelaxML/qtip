@@ -26,10 +26,11 @@ parser.add_argument('--limit', type=int, default=None)
 parser.add_argument('--apply_chat_template', action='store_true')
 parser.add_argument('--fewshot_as_multiturn', action='store_true')
 parser.add_argument('--manifest_model', action='store_true')
+parser.add_argument('--max_mem_ratio', type=float, default=0.7)
 
 
 def main(args):
-    model, model_str = model_from_hf_path(args.hf_path)
+    model, model_str = model_from_hf_path(args.hf_path, max_mem_ratio=args.max_mem_ratio)
 
     # manifest for faster inference
     # use for codebooks without kernel support
