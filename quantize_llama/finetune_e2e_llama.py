@@ -45,7 +45,6 @@ parser.add_argument('--ft_early_stop', default=3, type=int)
 parser.add_argument('--ft_train_lut', action='store_true')
 parser.add_argument('--ft_prefetch_trellis', action='store_true')
 parser.add_argument('--ft_grad_ckpt', action='store_true')
-parser.add_argument('--model_tie_weights', action='store_true')
 
 
 def llama_arg_fn(output, args, kwargs):
@@ -67,22 +66,21 @@ def main(args):
         orig_model = AutoModelForCausalLM.from_pretrained(
             args.base_model,
             torch_dtype='auto',
-            #device_map='sequential',
+            device_map='sequential',
             low_cpu_mem_usage=True)
 
-    #start_dev = max(orig_model.hf_device_map.values()) + 1
-    start_dev = 1
+    start_dev = max(orig_model.hf_device_map.values()) + 1
     end_dev = torch.cuda.device_count()
     fake_dev_map = {
         'model.embed_tokens': start_dev,
         'model.rotary_emb': start_dev,
-        'model.norm': start_dev,
-        'lm_head': start_dev
+        'model.norm': end_dev - 1,
+        'lm_head': end_dev - 1
     }
     per_dev = math.ceil(
-        (len(orig_model.model.layers) + 8) / (end_dev - start_dev))
+        (len(orig_model.model.layers) + 1) / (end_dev - start_dev))
     for i in range(len(orig_model.model.layers)):
-        fake_dev_map[f'model.layers.{i}'] = (i + 4) // per_dev + start_dev
+        fake_dev_map[f'model.layers.{i}'] = (i + 1) // per_dev + start_dev
 
     orig_dtype = orig_model.model.embed_tokens.weight.dtype
     print(orig_dtype)
@@ -93,7 +91,6 @@ def main(args):
     quant_model = model_from_hf_path(args.hf_path,
                                      device_map=fake_dev_map)[0].float()
 
-    
     for name, module in quant_model.named_modules():
         if isinstance(module, QuantizedLinear):
             module.SU = nn.Parameter(module.SU.float(), requires_grad=True)
