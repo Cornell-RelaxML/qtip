@@ -8,6 +8,33 @@ void decompress_matvec_16_9_2_1_256_1_256(
 					  torch::Tensor &out
 					  );
 
+void decompress_matvec_16_9_4_1_1024_1_3072(
+					  torch::Tensor &compressed,
+					  torch::Tensor &codebook,
+					  torch::Tensor &x,
+					  torch::Tensor &out
+					  );
+
+void decompress_matvec_16_9_4_1_8192_1_3072(
+					  torch::Tensor &compressed,
+					  torch::Tensor &codebook,
+					  torch::Tensor &x,
+					  torch::Tensor &out
+					  );
+
+void decompress_matvec_16_9_4_1_3072_1_8192(
+					  torch::Tensor &compressed,
+					  torch::Tensor &codebook,
+					  torch::Tensor &x,
+					  torch::Tensor &out
+					  );
+
+void decompress_matvec_16_9_4_1_3072_1_3072(
+					  torch::Tensor &compressed,
+					  torch::Tensor &codebook,
+					  torch::Tensor &x,
+					  torch::Tensor &out
+					  );
 
 void decompress_matvec_16_9_2_1_53248_1_16384(
 					    torch::Tensor &compressed,
@@ -461,6 +488,11 @@ void decompress_matvec_16_9_4_1_1024_1_8192(
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("decompress_matvec_16_9_2_1_256_1_256", &decompress_matvec_16_9_2_1_256_1_256, "decompress_matvec_16_9_2_1_256_1_256");
+
+  m.def("decompress_matvec_16_9_4_1_1024_1_3072", &decompress_matvec_16_9_4_1_1024_1_3072, "decompress_matvec_16_9_4_1_1024_1_3072");
+  m.def("decompress_matvec_16_9_4_1_8192_1_3072", &decompress_matvec_16_9_4_1_8192_1_3072, "decompress_matvec_16_9_4_1_8192_1_3072");
+  m.def("decompress_matvec_16_9_4_1_3072_1_8192", &decompress_matvec_16_9_4_1_3072_1_8192, "decompress_matvec_16_9_4_1_3072_1_8192");
+  m.def("decompress_matvec_16_9_4_1_3072_1_3072", &decompress_matvec_16_9_4_1_3072_1_3072, "decompress_matvec_16_9_4_1_3072_1_3072");
 
   m.def("decompress_matvec_16_9_2_1_53248_1_16384", &decompress_matvec_16_9_2_1_53248_1_16384, "decompress_matvec_16_9_2_1_53248_1_16384");
   m.def("decompress_matvec_16_9_3_1_53248_1_16384", &decompress_matvec_16_9_3_1_53248_1_16384, "decompress_matvec_16_9_3_1_53248_1_16384");

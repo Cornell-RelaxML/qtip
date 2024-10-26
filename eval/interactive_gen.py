@@ -146,18 +146,10 @@ def main(hf_path, compile, interactive, max_tokens, top_k):
         ids, text, decode_tps = generate(model, tokenizer, text, max_tokens,
                                          top_k, callback, past_kv)
         if not interactive:
-            ids = ids[0]
-            cutoff = 0
-            while cutoff < len(ids) and ids[cutoff] != tokenizer.eos_token_id:
-                cutoff += 1
-            ids = ids[:cutoff]
-            text = tokenizer.decode(torch.tensor(ids))
             print(text)
-            print()
-        else:
-            print()
+            
         print(
-            f"Decoding throughput: {decode_tps:.02f} tokens/sec. Includes tokens generated after the EOS token.\n\n"
+            f"\nDecoding throughput: {decode_tps:.02f} tokens/sec. Includes tokens generated after the EOS token.\n\n"
         )
 
 
