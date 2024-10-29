@@ -21,6 +21,8 @@ The main QTIP-related arguments in `quantize_llama/quantize_finetune_llama.py` a
 - `decode_mode`: `quantlut_sym` (HYB), `3inst` (3INST), `1mad` (1MAD), or 'lut' (pure LUT).
 - `td_x` and `td_y`: dimensions of trellis tile in LDLQ ($T_x$ and $T_y$ in the paper). `td_x` goes along the output dimension and `td_y` the input (channel) dimension.
 
+You will need to install the packages in `requirements.txt` to use this codebase with `pip install -r requirements.txt`. If you have issues installing `fast-hadamard-transform`, try building from [source](https://github.com/Dao-AILab/fast-hadamard-transform). 
+
 ## Fast inference
 
 QTIP achieves the same inference throughput as QuIP# despite achieving higher quality quantization.
