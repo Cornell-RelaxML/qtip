@@ -41,7 +41,7 @@ These kernels are located in `qtip_kernels` and have been integrated into the `B
 
 For example, if you want to generate up to 256 tokens of text from a 3 bit QTIP Llama 2 13B Chat model in "streaming mode" (slower than not streaming), run
 
-`python -m eval.interactive_gen --hf_path relaxml/Llama-2-13b-QTIP-3Bit --max_new_tokens 256 --enable_tf32 --streaming`
+`python -m eval.interactive_gen --hf_path relaxml/Llama-2-13b-QTIP-3Bit --max_new_tokens 256 --streaming`
 
 **Note:** This script does not fuse matrices (q/k/v and up/gate) so you will not get get the speeds in the table above if you run it.
 If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumbing to do so and should mostly translate over to this one.
