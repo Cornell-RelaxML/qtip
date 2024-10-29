@@ -61,7 +61,7 @@ python setup.py install
 
 Prequantized QTIP models with the HYB code, L=16, and V=2 can be found [here](https://huggingface.co/collections/relaxml/qtip-quantized-models-66fa253ad3186746f4b62803). These models can be used by passing in the HF Hub path (e.g. `relaxml/Llama-2-7b-QTIP-2Bit`) to the `--hf-path` flag in the eval scripts. The Llama 3.1 405B models ending in `TP8` were quantized with 8-way tensor parallelism support. Here, the RHT is performed per-GPU and instead of across GPUs. This results in slightly worse quality but enables inference with TP. We have not actually tested TP inference speeds, but feel free to use these models with your own TP inference codebase.
 
-**You must have access to the original gated Llama models (or at least their tokenizers) to be able to run these models with our eval scripts.** 
+**You must have access to the original gated Llama tokenizers to be able to run these models with our eval scripts.** 
 
 ## Other
 
