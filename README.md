@@ -7,7 +7,7 @@ QTIP uses incoherence processing to make LLM weight matrices approximately i.i.d
 QTIP solves naive TCQ's inherent slowness by introducing a series of novel compute-based codes for use with the "bitshift trellis."
 For more details, please see the [paper](https://arxiv.org/abs/2406.11235).
 
-## 👉 QTIP will appear at NeurIPS 2024 as a Spotlight! Feel free to reach out if you'll be there too!
+## 👉 QTIP will appear at NeurIPS 2024 as a Spotlight!
 
 ## How to use this codebase
 
