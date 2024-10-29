@@ -1,6 +1,6 @@
 # QTIP: Quantization with Trellises and Incoherence Processing [[arXiv]](https://arxiv.org/abs/2406.11235)
 
-<img src="assets/qtip_overview.PNG" width="800">
+<img src="assets/qtip_overview.png" width="800">
 
 This repository contains code for QTIP, a weight-only large language model (LLM) quantization method that achieves a state-of-the-art combination of quantization quality and speed.
 QTIP uses incoherence processing to make LLM weight matrices approximately i.i.d Gaussian, and then uses trellis coded quantization (TCQ) to quantize these weights with near-optimal distortion.
