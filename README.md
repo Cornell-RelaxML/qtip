@@ -45,10 +45,7 @@ For example, if you want to generate up to 256 tokens of text from a 3 bit QTIP 
 
 **Note:** This script does not fuse matrices (q/k/v and up/gate) so you will not get get the speeds in the table above if you run it.
 If you wish to quantize a model with matrix fusion, the QuIP# codebase has plumbing to do so and should mostly translate over to this one.
-This script also does not support CUDA graphs if the model spans multiple GPUs, so expect very slow inference if your model spans multiple GPUs. 
-Huggingface/Pytorch may add `torch.compile` support with `accelerate`-partitioned models (what the script uses) in the future, so this may change. 
-If you want fast multi-GPU inference today, you will need to integrate `lib/linear/quantized_linear.py` into your own model framework.
-Feel free to contribute to this codebase if you know an easy way to get CUDA graphs working with multiple GPUs (i.e. not hardcoded for Llama).
+
 
 ### Compiling the kernels
 
