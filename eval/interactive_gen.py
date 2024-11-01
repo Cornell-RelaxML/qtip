@@ -1,5 +1,5 @@
-# Most of this code is from https://github.com/chu-tianxiang/QuIP-for-all
-
+# This script is based off of the generation script in https://github.com/chu-tianxiang/QuIP-for-all
+import os
 import time
 from typing import Optional
 
@@ -32,7 +32,7 @@ def logits_to_probs(logits,
     probs = torch.nn.functional.softmax(logits, dim=-1)
     return probs
 
-
+@torch.compile
 def sample(logits, temperature: float = 1.0, top_k: Optional[int] = None):
     probs = logits_to_probs(logits[:, -1], temperature, top_k)
     idx_next = multinomial_sample_one_no_sync(probs)
@@ -50,15 +50,14 @@ def decode_one_tokens(model, cur_token, past_kv, cache_position):
 
 @torch.no_grad()
 def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+    inputs = tokenizer(text, return_tensors="pt").to(0)
     batch_size, seq_length = inputs["input_ids"].shape
-    cache_position = torch.arange(seq_length, device=model.device)
+    cache_position = torch.arange(seq_length, device=0)
     generated_ids = torch.zeros(batch_size,
                                 seq_length + max_new_tokens,
                                 dtype=torch.int,
-                                device=model.device)
-    generated_ids[:, cache_position] = inputs["input_ids"].to(model.device).to(
-        torch.int)
+                                device=0)
+    generated_ids[:, cache_position] = inputs["input_ids"].to(0).int()
     logits = model(**inputs,
                    past_key_values=past_kv,
                    cache_position=cache_position)[0]
@@ -68,7 +67,7 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     generated_ids[:, seq_length] = next_token
     callback(next_token)
 
-    cache_position = torch.tensor([seq_length + 1], device=model.device)
+    cache_position = torch.tensor([seq_length + 1], device=0)
     decode_time = time.time()
     for _ in range(1, max_new_tokens):
         with torch.backends.cuda.sdp_kernel(enable_flash=True,
@@ -86,34 +85,79 @@ def generate(model, tokenizer, text, max_new_tokens, top_k, callback, past_kv):
     return generated_ids, text, max_new_tokens / decode_time
 
 
+def llama_arg_fn(output, args, kwargs):
+    return (output[0], *args[1:]), kwargs
+
+def get_emb(args, kwargs):
+    return args[0]
+
+
+from lib.utils import shard_model as sm, clean
+
 def main(hf_path, compile, interactive, max_tokens, top_k):
     device = "cuda"
     model, model_str = model_from_hf_path(hf_path)
 
+    sharded = False
+    
+    if 'llama' in model_str.lower():
+        n_shards = model.lm_head.weight.device.index + 1
+        if n_shards > 1:
+            sharded = True
+            del model.model.layers
+            clean()
+            cpumodel, _ = model_from_hf_path(hf_path, device_map='cpu')
+            nlayers = len(cpumodel.model.layers)
+            shards = [torch.nn.ModuleList([]) for _ in range(n_shards)]
+            layer_device_map = []
+            for i in range(n_shards):
+                for j in range(int(nlayers * i / n_shards),
+                               int(nlayers * (i + 1) / n_shards)):
+                    shards[i].append(cpumodel.model.layers[j])
+                    layer_device_map.append(i)
+                shards[i] = {'device': i, 'arg_fn': llama_arg_fn, 'shard': shards[i]}
+            model.model.layers = [sm.ShardDecoderLayers(shards, model.lm_head.weight.dtype)]
+                                                   
+    
     tokenizer = AutoTokenizer.from_pretrained(model_str)
 
     tokenizer.pad_token = tokenizer.eos_token
-    past_kv = StaticCache(model.config,
-                          1,
-                          2048,
-                          device=model.device,
-                          dtype=model.dtype)
+    if not sharded:
+        past_kv = StaticCache(model.config,
+                              1,
+                              2*args.max_new_tokens,
+                              device=0,
+                              dtype=model.dtype)
+    else:
+        past_kv = StaticCache(model.config,
+                              1,
+                              2*args.max_new_tokens,
+                              layer_device_map=layer_device_map,
+                              dtype=model.dtype)
 
     text = "This is a test of this large language model"
     callback = lambda x: x
-    ids, text, _ = generate(model, tokenizer, text, 16, top_k, callback,
-                            past_kv)
+    ids, text, _ = generate(model, tokenizer, text,
+                            8, top_k, callback, past_kv)
 
     if compile:
-        print('Capturing CUDA graphs, may take some time.')
-        global decode_one_tokens
-        decode_one_tokens = torch.compile(decode_one_tokens,
-                                          mode="max-autotune",
-                                          fullgraph=True)
+        print('Capturing CUDA graphs, may take some time. If you are running a model over multiple GPUs, the first generation will be very slow due to compiling the model.')
+        if not sharded:
+            global decode_one_tokens
+            decode_one_tokens = torch.compile(decode_one_tokens,
+                                              mode="max-autotune",
+                                              fullgraph=True)
+        else:
+            for shard in model.model.layers[0].shards:
+                shard.forward = torch.compile(shard.forward,
+                                              mode='max-autotune',
+                                              fullgraph=True)
+
+
 
     text = "This is a test of this large language model"
-    ids, text, _ = generate(model, tokenizer, text, 8, top_k, callback,
-                            past_kv)
+    ids, text, _ = generate(model, tokenizer, text,
+                            16, top_k, callback, past_kv)
 
     while True:
         prompt = input("What is your prompt? ")
@@ -143,8 +187,8 @@ def main(hf_path, compile, interactive, max_tokens, top_k):
 
         if not interactive:
             callback = lambda x: x
-        ids, text, decode_tps = generate(model, tokenizer, text, max_tokens,
-                                         top_k, callback, past_kv)
+        ids, text, decode_tps = generate(model, tokenizer, text,
+                                         max_tokens, top_k, callback, past_kv)
         if not interactive:
             print(text)
             
