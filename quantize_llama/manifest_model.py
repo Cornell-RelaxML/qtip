@@ -37,7 +37,7 @@ def main(args):
             w = module.codebook_class.hatW.float()
             w = ((w*module.SU).T * module.SV).T * module.codebook_class.scale
             manifested_linear = attrgetter(name)(manifested_model)
-            manifested_linear.weight.copy_(w)
+            manifested_linear.weight.copy_(w.to(manifested_linear.weight.dtype))
     # set name or path to name of original model for tokenizer loading
     manifested_model.config._name_or_path = model_str
     manifested_model.save_pretrained(args.output_path, safe_serialization=True)
