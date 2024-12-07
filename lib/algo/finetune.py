@@ -31,6 +31,12 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
     with use_tf32():
         layer = layer.to(device)
 
+        source = next(iter(train_dl))[0]
+        position_ids = torch.arange(source.shape[1], device=device).unsqueeze(0)
+        # manifest tensor parallel attributes in layer
+        output = layer(source.to(device),
+                       position_ids=position_ids)[0]
+        
         best_sd = {k: v.cpu() for k, v in layer.state_dict().items()}
         utils.clean()
 
@@ -40,15 +46,8 @@ def finetune_decoder_layer(layer, name, device, train_dl, valid_dl, orig_dtype,
         scaler = torch.cuda.amp.GradScaler(enabled=(orig_dtype==torch.float16))
         worse_ct = 0
 
-        position_ids = None
-
         for epoch in range(args.ft_epochs):
             for bidx, (source, targets) in enumerate(train_dl):
-
-                if position_ids is None:
-                    position_ids = torch.arange(source.shape[1],
-                                                device=device).unsqueeze(0)
-
                 targets = targets.to(device, non_blocking=True)
                 with torch.autocast(device_type='cuda',
                                     dtype=orig_dtype,
