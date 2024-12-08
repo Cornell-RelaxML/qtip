@@ -15,6 +15,7 @@ from transformers.modeling_attn_mask_utils import \
 from lib import utils
 from lib.algo import finetune
 from lib.codebook import bitshift
+from operator import attrgetter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
@@ -51,6 +52,7 @@ parser.add_argument('--decode_mode', default='lut', type=str)
 parser.add_argument('--ft_train_lut', action='store_true')
 parser.add_argument('--split_for_tp', action='store_true')
 parser.add_argument('--tp_rank', default=8, type=int)
+parser.add_argument('--skip_list', default=None, type=str)
 
 
 def check_exist(idx, args):
@@ -63,18 +65,26 @@ def check_exist(idx, args):
 
 
 def quantize_llama_decoder(layer, idx, cb, args, device, pre_orig_emb,
-                           orig_emb, model_config):
+                           orig_emb, model_config, skip_list):
     if check_exist(idx, args):
         return
 
+    
     # layer name, save_name, input hessian file, output hessian file
-    quant_order = [('self_attn.v_proj', 'v', 'qkv', 'v', 'col'),
-                   ('self_attn.q_proj', 'q', 'qkv', 'q', 'col'),
-                   ('self_attn.k_proj', 'k', 'qkv', 'k', 'col'),
-                   ('self_attn.o_proj', 'o', 'o', 'o', 'row'),
-                   ('mlp.up_proj', 'up', 'up', 'up', 'col'),
-                   ('mlp.gate_proj', 'gate', 'up', 'gate', 'col'),
-                   ('mlp.down_proj', 'down', 'down', 'down', 'row')]
+    quant_order = []
+    for thing in [('self_attn.v_proj', 'v', 'qkv', 'v', 'col'),
+                  ('self_attn.q_proj', 'q', 'qkv', 'q', 'col'),
+                  ('self_attn.k_proj', 'k', 'qkv', 'k', 'col'),
+                  ('self_attn.o_proj', 'o', 'o', 'o', 'row'),
+                  ('mlp.up_proj', 'up', 'up', 'up', 'col'),
+                  ('mlp.gate_proj', 'gate', 'up', 'gate', 'col'),
+                  ('mlp.down_proj', 'down', 'down', 'down', 'row')]:
+        if f'{idx}_{thing[1]}' not in skip_list:
+            quant_order.append(thing)
+        else:
+            attrgetter(thing[0])(layer).weight.requires_grad = False
+            print(f'skipping {idx}_{thing[1]}')
+        
     finetune.quantize_finetune_decoder_layer(layer, quant_order, idx, cb, args,
                                              device, pre_orig_emb, orig_emb)
     torch.save(
@@ -85,6 +95,9 @@ def quantize_llama_decoder(layer, idx, cb, args, device, pre_orig_emb,
 
 
 def main(args):
+    if args.skip_list is not None:
+        args.skip_list = args.skip_list.split(',')
+        
     dtype_ = torch.float64 if args.use_fp64 else torch.float32
 
     cb = bitshift.bitshift_codebook(L=args.L,
@@ -109,6 +122,7 @@ def main(args):
         'td_x': args.td_x,
         'td_y': args.td_y,
         'split_for_tp': args.split_for_tp,
+        'skip_list': args.skip_list,
     }
     all_config['model_config'].update({'quip_params': quip_params})
     torch.save(all_config, os.path.join(args.save_path, 'config.pt'))
@@ -178,6 +192,7 @@ def main(args):
                                                 orig_emb_cache[cur_device],
                                                 orig_emb_cache[cur_device + 1],
                                                 all_config['model_config'],
+                                                args.skip_list
                                             )), i)
         proc_list[cur_device][0].start()
 

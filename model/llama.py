@@ -297,7 +297,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
 
 class LlamaMLP(nn.Module):
 
-    def __init__(self, config):
+    def __init__(self, config, layer_idx):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -311,39 +311,59 @@ class LlamaMLP(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
-        self.gate_proj = QuantizedLinear(self.hidden_size,
-                                         self.intermediate_size,
-                                         td_x,
-                                         td_y,
-                                         L,
-                                         K,
-                                         V,
-                                         tlut_bits,
-                                         decode_mode,
-                                         dtype=config.torch_dtype,
-                                         bias=False)
-        self.up_proj = QuantizedLinear(self.hidden_size,
+        if f'{layer_idx}_gate' not in config.quip_params['skip_list']:
+            self.gate_proj = QuantizedLinear(self.hidden_size,
+                                             self.intermediate_size,
+                                             td_x,
+                                             td_y,
+                                             L,
+                                             K,
+                                             V,
+                                             tlut_bits,
+                                             decode_mode,
+                                             dtype=config.torch_dtype,
+                                             bias=False)
+        else:
+            self.gate_proj = nn.Linear(self.hidden_size,
                                        self.intermediate_size,
-                                       td_x,
-                                       td_y,
-                                       L,
-                                       K,
-                                       V,
-                                       tlut_bits,
-                                       decode_mode,
                                        dtype=config.torch_dtype,
                                        bias=False)
-        self.down_proj = QuantizedLinear(self.intermediate_size,
-                                         self.hidden_size,
-                                         td_x,
-                                         td_y,
-                                         L,
-                                         K,
-                                         V,
-                                         tlut_bits,
-                                         decode_mode,
-                                         dtype=config.torch_dtype,
-                                         bias=False)
+
+        if f'{layer_idx}_up' not in config.quip_params['skip_list']:
+            self.up_proj = QuantizedLinear(self.hidden_size,
+                                           self.intermediate_size,
+                                           td_x,
+                                           td_y,
+                                           L,
+                                           K,
+                                           V,
+                                           tlut_bits,
+                                           decode_mode,
+                                           dtype=config.torch_dtype,
+                                           bias=False)
+        else:
+            self.up_proj = nn.Linear(self.hidden_size,
+                                     self.intermediate_size,
+                                     dtype=config.torch_dtype,
+                                     bias=False)
+
+        if f'{layer_idx}_down' not in config.quip_params['skip_list']:
+            self.down_proj = QuantizedLinear(self.intermediate_size,
+                                             self.hidden_size,
+                                             td_x,
+                                             td_y,
+                                             L,
+                                             K,
+                                             V,
+                                             tlut_bits,
+                                             decode_mode,
+                                             dtype=config.torch_dtype,
+                                             bias=False)
+        else:
+            self.down_proj = nn.Linear(self.intermediate_size,
+                                       self.hidden_Size,
+                                       dtype=config.torch_dtype,
+                                       bias=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
 
@@ -428,50 +448,77 @@ class LlamaAttention(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
-        self.q_proj = QuantizedLinear(self.hidden_size,
-                                      self.num_heads * self.head_dim,
-                                      td_x,
-                                      td_y,
-                                      L,
-                                      K,
-                                      V,
-                                      tlut_bits,
-                                      decode_mode,
-                                      dtype=config.torch_dtype,
-                                      bias=config.attention_bias)
-        self.k_proj = QuantizedLinear(self.hidden_size,
-                                      self.num_key_value_heads * self.head_dim,
-                                      td_x,
-                                      td_y,
-                                      L,
-                                      K,
-                                      V,
-                                      tlut_bits,
-                                      decode_mode,
-                                      dtype=config.torch_dtype,
-                                      bias=config.attention_bias)
-        self.v_proj = QuantizedLinear(self.hidden_size,
-                                      self.num_key_value_heads * self.head_dim,
-                                      td_x,
-                                      td_y,
-                                      L,
-                                      K_v_proj,
-                                      V,
-                                      tlut_bits,
-                                      decode_mode,
-                                      dtype=config.torch_dtype,
-                                      bias=config.attention_bias)
-        self.o_proj = QuantizedLinear(self.num_heads * self.head_dim,
-                                      self.hidden_size,
-                                      td_x,
-                                      td_y,
-                                      L,
-                                      K,
-                                      V,
-                                      tlut_bits,
-                                      decode_mode,
-                                      dtype=config.torch_dtype,
-                                      bias=config.attention_bias)
+        if f'{layer_idx}_q' not in config.quip_params['skip_list']:
+            self.q_proj = QuantizedLinear(self.hidden_size,
+                                          self.num_heads * self.head_dim,
+                                          td_x,
+                                          td_y,
+                                          L,
+                                          K,
+                                          V,
+                                          tlut_bits,
+                                          decode_mode,
+                                          dtype=config.torch_dtype,
+                                          bias=config.attention_bias)
+        else:
+            self.q_proj = nn.Linear(self.hidden_size,
+                                    self.num_heads * self.head_dim,
+                                    dtype=config.torch_dtype,
+                                    bias=config.attention_bias)
+
+        if f'{layer_idx}_k' not in config.quip_params['skip_list']:
+            self.k_proj = QuantizedLinear(self.hidden_size,
+                                          self.num_key_value_heads * self.head_dim,
+                                          td_x,
+                                          td_y,
+                                          L,
+                                          K,
+                                          V,
+                                          tlut_bits,
+                                          decode_mode,
+                                          dtype=config.torch_dtype,
+                                          bias=config.attention_bias)
+        else:
+            self.k_proj = nn.Linear(self.hidden_size,
+                                    self.num_key_value_heads * self.head_dim,
+                                    dtype=config.torch_dtype,
+                                    bias=config.attention_bias)
+
+        if f'{layer_idx}_v' not in config.quip_params['skip_list']:
+            self.v_proj = QuantizedLinear(self.hidden_size,
+                                          self.num_key_value_heads * self.head_dim,
+                                          td_x,
+                                          td_y,
+                                          L,
+                                          K_v_proj,
+                                          V,
+                                          tlut_bits,
+                                          decode_mode,
+                                          dtype=config.torch_dtype,
+                                          bias=config.attention_bias)
+        else:
+            self.v_proj = nn.Linear(self.hidden_size,
+                                    self.num_key_value_heads * self.head_dim,
+                                    dtype=config.torch_dtype,
+                                    bias=config.attention_bias)
+
+        if f'{layer_idx}_o' not in config.quip_params['skip_list']:
+            self.o_proj = QuantizedLinear(self.num_heads * self.head_dim,
+                                          self.hidden_size,
+                                          td_x,
+                                          td_y,
+                                          L,
+                                          K,
+                                          V,
+                                          tlut_bits,
+                                          decode_mode,
+                                          dtype=config.torch_dtype,
+                                          bias=config.attention_bias)
+        else:
+            self.o_proj = nn.Linear(self.num_heads * self.head_dim,
+                                    self.hidden_size,
+                                    dtype=config.torch_dtype,
+                                    bias=config.attention_bias)        
 
         # TODO (joao): remove in v4.46 (RoPE is computed in the model, not in the decoder layers)
         self.rotary_emb = LlamaRotaryEmbedding(config=self.config)
@@ -860,7 +907,7 @@ class LlamaDecoderLayer(nn.Module):
         self.self_attn = LLAMA_ATTENTION_CLASSES[config._attn_implementation](
             config=config, layer_idx=layer_idx)
 
-        self.mlp = LlamaMLP(config)
+        self.mlp = LlamaMLP(config, layer_idx=layer_idx)
         self.input_layernorm = LlamaRMSNorm(config.hidden_size,
                                             eps=config.rms_norm_eps)
         self.post_attention_layernorm = LlamaRMSNorm(config.hidden_size,
