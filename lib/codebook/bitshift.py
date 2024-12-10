@@ -452,13 +452,15 @@ class BitshiftLinear(nn.Module):
                     self.cb.recons_lut()
 
                 if self.has_kernel:
-                    hatW = self.get_hatW_kernel(trellis, m, n)
+                    x = BitshiftLinearKernelAG.apply(
+                        x, trellis, m, n, self.cb.L, self.cb.tlut_bits, self.cb.K,
+                        self.V, self.cb.lut).float()
                 else:
                     if mode == 'eval':
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
                     hatW = self.get_hatW(trellis, m, n)
-                x = (x.to(hatW.dtype) @ hatW.T).float()
+                    x = (x.to(hatW.dtype) @ hatW.T).float()
 
             if rcp == 2:
                 x = matmul_hadU_cuda(x.reshape(-1, m // tp_rank), had_right,
@@ -468,3 +470,36 @@ class BitshiftLinear(nn.Module):
 
         x = x.to(SV.device) * (SV * self.scale)
         return x.view(*input.shape[:-1], m).to(input.dtype)
+
+
+        
+class BitshiftLinearKernelAG(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input, trellis, m, n, L, tlut_bits, K, V, lut):
+        ctx.save_for_backward(trellis, lut)
+        ctx.L = L
+        ctx.tlut_bits = tlut_bits
+        ctx.K = K
+        ctx.V = V
+        ctx.m = m
+        ctx.n = n
+        
+        hatW = decode_compressed(L, tlut_bits, K, int(math.log2(V)),
+                                 m, n, trellis.view(-1), lut.T)
+        return input.to(hatW.dtype) @ hatW.T
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        trellis, lut = ctx.saved_tensors
+        L = ctx.L
+        tlut_bits = ctx.tlut_bits
+        K = ctx.K
+        V = ctx.V
+        m = ctx.m
+        n = ctx.n
+
+        hatW = decode_compressed(L, tlut_bits, K, int(math.log2(V)),
+                                 m, n, trellis.view(-1), lut.T)
+        
+        grad_input = grad_output.to(hatW.dtype) @ hatW
+        return grad_input, None, None, None, None, None, None, None, None

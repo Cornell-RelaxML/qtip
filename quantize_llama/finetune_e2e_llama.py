@@ -78,9 +78,9 @@ def main(args):
         'lm_head': end_dev - 1
     }
     per_dev = math.ceil(
-        (len(orig_model.model.layers) + 1) / (end_dev - start_dev))
+        (len(orig_model.model.layers) + 4) / (end_dev - start_dev))
     for i in range(len(orig_model.model.layers)):
-        fake_dev_map[f'model.layers.{i}'] = (i + 1) // per_dev + start_dev
+        fake_dev_map[f'model.layers.{i}'] = (i + 2) // per_dev + start_dev
 
     orig_dtype = orig_model.model.embed_tokens.weight.dtype
     print(orig_dtype)
