@@ -311,6 +311,9 @@ class LlamaMLP(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
+        if config.quip_params['skip_list'] is None:
+            config.quip_params['skip_list'] = []
+            
         if f'{layer_idx}_gate' not in config.quip_params['skip_list']:
             self.gate_proj = QuantizedLinear(self.hidden_size,
                                              self.intermediate_size,
@@ -448,6 +451,10 @@ class LlamaAttention(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
+        if config.quip_params['skip_list'] is None:
+            config.quip_params['skip_list'] = []
+
+        
         if f'{layer_idx}_q' not in config.quip_params['skip_list']:
             self.q_proj = QuantizedLinear(self.hidden_size,
                                           self.num_heads * self.head_dim,

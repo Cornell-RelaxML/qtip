@@ -37,6 +37,8 @@ def main(args):
                                            low_cpu_mem_usage=True,
                                            config=model_config)
 
+    if model_config.quip_params['skip_list'] is None:
+        model_config.quip_params['skip_list'] = []
     
     cpu = torch.device('cpu')
     if os.path.exists(f'{args.quantized_path}/lmhead.pt'):

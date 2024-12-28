@@ -69,7 +69,9 @@ def quantize_llama_decoder(layer, idx, cb, args, device, pre_orig_emb,
     if check_exist(idx, args):
         return
 
-    
+    if skip_list is None:
+        skip_list = []
+        
     # layer name, save_name, input hessian file, output hessian file
     quant_order = []
     for thing in [('self_attn.v_proj', 'v', 'qkv', 'v', 'col'),
