@@ -98,6 +98,7 @@ def main(args):
             if module.tlut is not None and args.ft_train_lut:
                 module.tlut.requires_grad = True
             if args.ft_train_lut:
+                module.use_prev_kernel = False
                 module.mode = 'train-recons'
                 glog.info('overriding ft_prefetch_trellis')
             elif args.ft_prefetch_trellis:

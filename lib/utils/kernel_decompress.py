@@ -1,8 +1,21 @@
 import torch
-
+import math
 
 @torch.compile
 def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
+    indices = decode_indices(L, R, V, m, k, compressed)
+
+    # decode lut
+    mma_swizzled = expanded_lut[indices]
+
+    # deswizzle m16n8k16 mma pattern
+    decompressed = (mma_swizzled.reshape(m // 16, k // 16, 16, 16).reshape(
+        m // 16, k // 16, 8, 4, 2, 2, 2).permute(0, -2, 2, 1, -3, 3,
+                                                 -1).reshape(m, k))
+    return decompressed
+
+@torch.compile
+def decode_indices(L, R, V, m, k, compressed):
     if compressed.dtype != torch.uint16:
         compressed = compressed.view(torch.uint16)
 
@@ -44,12 +57,33 @@ def decode_compressed(L, S, R, V, m, k, compressed, expanded_lut):
     shifted = expanded32 >> (16 - shifts)
     indices = torch.bitwise_and(
         shifted.reshape(shifted.shape[0], -1)[:, 16 - L::R << V], (1 << L) - 1)
+    
+    return indices
 
-    # decode lut
-    mma_swizzled = expanded_lut[indices]
 
-    # deswizzle m16n8k16 mma pattern
-    decompressed = (mma_swizzled.reshape(m // 16, k // 16, 16, 16).reshape(
-        m // 16, k // 16, 8, 4, 2, 2, 2).permute(0, -2, 2, 1, -3, 3,
-                                                 -1).reshape(m, k))
-    return decompressed
+# for ensuring non-diffentiablity
+class NonDiffDecode(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, trellis, m, n, L, K, V):
+        ctx.L = L
+        ctx.K = K
+        ctx.V = V
+        ctx.m = m
+        ctx.n = n
+        
+        indices = decode_indices(L, K, int(math.log2(V)),
+                                 m, n, trellis.view(-1))
+        return indices
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return None, None, None, None, None, None
+
+def bitshift_linear_kernel(input, trellis, m, n, L, tlut_bits, K, V, lut):
+    indices = NonDiffDecode.apply(trellis, m, n, L, K, V) 
+    mma_swizzled = lut.T[indices]
+
+    hatW = (mma_swizzled.reshape(m // 16, n // 16, 16, 16).reshape(
+        m // 16, n // 16, 8, 4, 2, 2, 2).permute(0, -2, 2, 1, -3, 3,
+                                                 -1).reshape(m, n))
+    return input.to(hatW.dtype) @ hatW.T
