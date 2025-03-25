@@ -16,6 +16,7 @@ torch.set_grad_enabled(False)
 parser = argparse.ArgumentParser()
 parser.add_argument('--quantized_path', type=str)
 parser.add_argument('--hf_output_path', type=str)
+parser.add_argument('--skip_list', default=None, type=str)
 
 
 def main(args):
@@ -49,6 +50,13 @@ def main(args):
         model.model.norm.weight.copy_(lmhead_data['norm'].to(
             model.model.norm.weight.dtype))
 
+    if args.skip_list is not None:
+        args.skip_list = args.skip_list.split(',')
+    else:
+        args.skip_list = []
+
+    skip_list_union = [*args.skip_list, *model_config.quip_params['skip_list']]
+        
     for ii in range(len(model.model.layers)):
         layer = model.model.layers[ii]
 
@@ -61,49 +69,49 @@ def main(args):
                 ln_data['post_attention_layernorm'].to(
                     layer.post_attention_layernorm.weight.dtype))
 
-        if f'{ii}_q' not in model_config.quip_params['skip_list']:
+        if f'{ii}_q' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_q.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.self_attn.q_proj, saved_layer)
         else:
             layer.self_attn.q_proj = orig_model.model.layers[ii].self_attn.q_proj
         
-        if f'{ii}_k' not in model_config.quip_params['skip_list']:
+        if f'{ii}_k' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_k.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.self_attn.k_proj, saved_layer)
         else:
             layer.self_attn.k_proj = orig_model.model.layers[ii].self_attn.k_proj
             
-        if f'{ii}_v' not in model_config.quip_params['skip_list']:
+        if f'{ii}_v' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_v.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.self_attn.v_proj, saved_layer)
         else:
             layer.self_attn.v_proj = orig_model.model.layers[ii].self_attn.v_proj
 
-        if f'{ii}_o' not in model_config.quip_params['skip_list']:
+        if f'{ii}_o' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_o.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.self_attn.o_proj, saved_layer)
         else:
             layer.self_attn.o_proj = orig_model.model.layers[ii].self_attn.o_proj
 
-        if f'{ii}_up' not in model_config.quip_params['skip_list']:
+        if f'{ii}_up' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_up.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.mlp.up_proj, saved_layer)
         else:
             layer.mlp.up_proj = orig_model.model.layers[ii].mlp.up_proj
             
-        if f'{ii}_gate' not in model_config.quip_params['skip_list']:
+        if f'{ii}_gate' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_gate.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.mlp.gate_proj, saved_layer)
         else:
             layer.mlp.gate_proj = orig_model.model.layers[ii].mlp.gate_proj
                       
-        if f'{ii}_down' not in model_config.quip_params['skip_list']:
+        if f'{ii}_down' not in skip_list_union:
             saved_layer = torch.load(f'{args.quantized_path}/{ii}_down.pt',
                                      map_location=cpu)
             utils.unpack_quip(layer.mlp.down_proj, saved_layer)

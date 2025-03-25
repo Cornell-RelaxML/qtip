@@ -311,7 +311,7 @@ class LlamaMLP(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
-        if config.quip_params['skip_list'] is None:
+        if config.quip_params.get('skip_list', None) is None:
             config.quip_params['skip_list'] = []
             
         if f'{layer_idx}_gate' not in config.quip_params['skip_list']:
@@ -451,7 +451,7 @@ class LlamaAttention(nn.Module):
         tlut_bits = config.quip_params['tlut_bits']
         decode_mode = config.quip_params['decode_mode']
 
-        if config.quip_params['skip_list'] is None:
+        if config.quip_params.get('skip_list', None) is None:
             config.quip_params['skip_list'] = []
 
         
