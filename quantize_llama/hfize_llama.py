@@ -56,7 +56,8 @@ def main(args):
         args.skip_list = []
 
     skip_list_union = [*args.skip_list, *model_config.quip_params['skip_list']]
-        
+    model.config.quip_params['skip_list'] = skip_list_union
+
     for ii in range(len(model.model.layers)):
         layer = model.model.layers[ii]
 

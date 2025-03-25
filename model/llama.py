@@ -364,7 +364,7 @@ class LlamaMLP(nn.Module):
                                              bias=False)
         else:
             self.down_proj = nn.Linear(self.intermediate_size,
-                                       self.hidden_Size,
+                                       self.hidden_size,
                                        dtype=config.torch_dtype,
                                        bias=False)
 
