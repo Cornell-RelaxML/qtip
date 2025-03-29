@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from lib.codebook import kdict
 from lib.utils.kernel_check import has_kernel
-from lib.utils.kernel_decompress import decode_compressed
+from lib.utils.kernel_decompress import decode_compressed, bitshift_linear_kernel
 from lib.utils.matmul_had import matmul_hadU_cuda, matmul_hadUt_cuda
 
 
@@ -424,6 +424,7 @@ class BitshiftLinear(nn.Module):
                 rcp,
                 tp_rank,
                 mode='eval',
+                use_prev_kernel=False,
                 **kwargs):
         n, m = len(SU), len(SV)
         x = input.view(-1, n).to(torch.float32)
@@ -452,9 +453,14 @@ class BitshiftLinear(nn.Module):
                     self.cb.recons_lut()
 
                 if self.has_kernel:
-                    x = BitshiftLinearKernelAG.apply(
-                        x, trellis, m, n, self.cb.L, self.cb.tlut_bits, self.cb.K,
-                        self.V, self.cb.lut).float()
+                    if use_prev_kernel:
+                        x = BitshiftLinearKernelAG.apply(
+                            x, trellis, m, n, self.cb.L, self.cb.tlut_bits, self.cb.K,
+                            self.V, self.cb.lut).float()
+                    else:
+                        x = bitshift_linear_kernel(
+                            x, trellis, m, n, self.cb.L, self.cb.tlut_bits, self.cb.K,
+                            self.V, self.cb.lut).float()
                 else:
                     if mode == 'eval':
                         trellis = self.cb.unpack_trellis(
