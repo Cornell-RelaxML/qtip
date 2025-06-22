@@ -1,7 +1,7 @@
 # [QTIP: Quantization with Trellises and Incoherence Processing](https://arxiv.org/abs/2406.11235), NeurIPS 2024 Spotlight
 
 ----
-## 🚨 Our latest work, [YAQA](https://github.com/Cornell-RelaxML/yaqa-quantization), introduces a new rounding algorithm that outperforms the BlockLDLQ rounding algorithm in this repository. YAQA is compatible with the QTIP quantizer and significantly outperforms BlockLDLQ.
+## 🚨 Our latest work, [YAQA](https://github.com/Cornell-RelaxML/yaqa-quantization), introduces a new rounding algorithm that is compatible with the QTIP quantizer and outperforms the BlockLDLQ rounding algorithm used in this repository.
 ----
 
 <img src="assets/qtip_overview.png" width="800">
