@@ -25,6 +25,7 @@ class QuantizedLinear(nn.Module):
         bias=False,
         dtype=torch.float16,
         mode='eval',
+        use_prev_kernel=True,
         grad_ckpt=False,
     ):
         super().__init__()
@@ -76,6 +77,7 @@ class QuantizedLinear(nn.Module):
         self.K_left = K_left
         self.K_right = K_right
         self.mode = mode
+        self.use_prev_kernel = use_prev_kernel
         self.grad_ckpt = grad_ckpt
         self.has_kernel = has_kernel(decode_mode, L, K, V, tlut_bits, td_x,
                                      td_y)
@@ -145,7 +147,8 @@ class QuantizedLinear(nn.Module):
                                      self.K_right,
                                      self.rcp,
                                      self.tp_rank,
-                                     mode=self.mode) + 0
+                                     mode=self.mode,
+                                     use_prev_kernel=self.use_prev_kernel) + 0
         if self.bias is not None:
             return result + self.bias
         return result
